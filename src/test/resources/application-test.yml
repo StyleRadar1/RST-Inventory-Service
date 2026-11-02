@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: ms-inventario-test
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
