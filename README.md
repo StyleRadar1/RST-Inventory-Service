@@ -176,7 +176,7 @@ flowchart TD
           <img src="https://img.shields.io/badge/DIAGRAMA-COMPONENTES-12063A?style=for-the-badge" alt="Diagrama de componentes" /><br />
           <strong><font color="#5600EF" size="3">DIAGRAMA DE COMPONENTES ESPECÍFICO (HEXAGONAL)</font></strong>
         </p>
-        <p><em>Diagrama pendiente; su elaboración está planeada como tarea del Sprint 2 en Jira.</em></p>
+        <p><em>Diagrama pendiente.</em></p>
       </td>
     </tr>
   </table>
@@ -192,7 +192,7 @@ flowchart TD
           <img src="https://img.shields.io/badge/DIAGRAMA-CLASES-12063A?style=for-the-badge" alt="Diagrama de clases" /><br />
           <strong><font color="#5600EF" size="3">DIAGRAMA DE CLASES DEL DOMINIO</font></strong>
         </p>
-        <p><em>Diagrama pendiente; su elaboración está planeada como tarea del Sprint 2 en Jira.</em></p>
+        <p><em>Diagrama pendiente.</em></p>
       </td>
     </tr>
   </table>
@@ -208,7 +208,7 @@ flowchart TD
           <img src="https://img.shields.io/badge/DIAGRAMA-BASE_DE_DATOS-12063A?style=for-the-badge" alt="Diagrama de base de datos" /><br />
           <strong><font color="#5600EF" size="3">MODELO DE DATOS (POSTGRESQL)</font></strong>
         </p>
-        <p><em>Diagrama pendiente; su elaboración está planeada como tarea del Sprint 2 en Jira.</em></p>
+        <p><em>Diagrama pendiente.</em></p>
       </td>
     </tr>
   </table>
@@ -276,7 +276,7 @@ src/main/java/edu/dosw/styleradar/inventario/
           <strong><font color="#5600EF" size="3">DOCUMENTACIÓN SWAGGER OPENAPI UI ACTIVA</font></strong>
         </p>
         <p>
-<em>Evidencia pendiente; se agrega junto con los diagramas del servicio.</em>
+<em>Evidencia pendiente.</em>
         </p>
       </td>
     </tr>
@@ -311,8 +311,6 @@ La comunicación asíncrona entre microservicios se realiza a través de **Rabbi
 | :---: | :--- | :--- | :--- |
 | **PUBLICA** | `StockChangedEvent` | `ms-inventario` &rarr; `ms-playlist`, `ms-notificaciones` | Cambio en las unidades disponibles de una talla. |
 | **PUBLICA** | `PrendaAgotadaEvent` | `ms-inventario` &rarr; `ms-item-catalogo`, `ms-playlist` | Todas las tallas de una prenda quedaron sin unidades. |
-
-Por ahora el servicio no consume eventos de otros servicios.
 
 ---
 
@@ -362,7 +360,7 @@ docker compose up -d --build
           <strong><font color="#5600EF" size="3">CONTENEDOR OCI DOCKER EN EJECUCIÓN (docker compose ps)</font></strong>
         </p>
         <p>
-<em>Evidencia pendiente; se agrega junto con los diagramas del servicio.</em>
+<em>Evidencia pendiente.</em>
         </p>
       </td>
     </tr>
@@ -409,7 +407,7 @@ Las pruebas unitarias validan el dominio y los casos de uso, y las de integraci�
           <strong><font color="#5600EF" size="3">REPORTE CONSOLIDADO DE COBERTURA JACOCO (≥ 85%)</font></strong>
         </p>
         <p>
-<em>Evidencia pendiente; el reporte se adjunta cuando el servicio tenga casos de uso implementados.</em>
+<em>Evidencia pendiente.</em>
         </p>
       </td>
     </tr>
@@ -458,7 +456,7 @@ flowchart LR
           <strong><font color="#5600EF" size="3">EJECUCIÓN DEL PIPELINE CI/CD EN VERDE</font></strong>
         </p>
         <p>
-<em>Evidencia pendiente; el estado actual se consulta en el badge del pipeline.</em>
+<em>Evidencia pendiente.</em>
         </p>
       </td>
     </tr>
@@ -506,7 +504,7 @@ Los cambios llegan a `develop` y `master` únicamente por pull request, con revi
           <strong><font color="#5600EF" size="3">TABLERO SCRUM Y SEGUIMIENTO DE LA ÉPICA EN JIRA</font></strong>
         </p>
         <p>
-<em>Evidencia pendiente; se agrega junto con los diagramas del servicio.</em>
+<em>Evidencia pendiente.</em>
         </p>
       </td>
     </tr>
