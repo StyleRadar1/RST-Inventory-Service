@@ -59,7 +59,7 @@
 
 <a id="1-nombre-del-servicio-y-su-bounded-context"></a>
 
-## <img src="https://img.shields.io/badge/01-5600EF?style=for-the-badge" height="20" align="absmiddle" /> NOMBRE DEL SERVICIO Y SU BOUNDED CONTEXT
+## <img src="https://img.shields.io/badge/01-5600EF?style=for-the-badge" height="20" align="absmiddle" /> 1. NOMBRE DEL SERVICIO Y SU BOUNDED CONTEXT
 
 * **Identificador de Servicio:** `ms-inventario`
 * **Paquete Arquitectónico:** `Paquete 2: Catálogo`
@@ -92,7 +92,7 @@ Este microservicio encapsula exclusivamente la lógica de negocio del inventario
 
 <a id="2-equipo-y-responsables"></a>
 
-## <img src="https://img.shields.io/badge/02-5600EF?style=for-the-badge" height="20" align="absmiddle" /> EQUIPO Y RESPONSABLES
+## <img src="https://img.shields.io/badge/02-5600EF?style=for-the-badge" height="20" align="absmiddle" /> 2. EQUIPO Y RESPONSABLES
 
 Desarrollado y mantenido por el **Equipo `Restrepo`** (prefijo `RST`) para la asignatura DOSW 2026.
 
@@ -110,7 +110,7 @@ Desarrollado y mantenido por el **Equipo `Restrepo`** (prefijo `RST`) para la as
 
 <a id="3-arquitectura-hexagonal-con-su-diagrama"></a>
 
-## <img src="https://img.shields.io/badge/03-5600EF?style=for-the-badge" height="20" align="absmiddle" /> ARQUITECTURA HEXAGONAL CON SU DIAGRAMA
+## <img src="https://img.shields.io/badge/03-5600EF?style=for-the-badge" height="20" align="absmiddle" /> 3. ARQUITECTURA HEXAGONAL CON SU DIAGRAMA
 
 El servicio sigue la arquitectura hexagonal acordada por el curso. Las reglas del negocio se mantienen aisladas de las herramientas externas, como la base de datos, el broker de mensajería o la API REST, de modo que estas pueden cambiar sin afectar la lógica principal.
 
@@ -214,7 +214,7 @@ flowchart TD
   </table>
 </div>
 
-### Estructura de Paquetes en `src/main/java/`
+### Estructura Oficial de Paquetes en `src/main/java/`
 
 ```text
 src/main/java/edu/dosw/styleradar/inventario/
@@ -259,11 +259,13 @@ src/main/java/edu/dosw/styleradar/inventario/
 
 ## <img src="https://img.shields.io/badge/04-5600EF?style=for-the-badge" height="20" align="absmiddle" /> 4. ENDPOINTS Y ENLACE A SWAGGER
 
-### Enlaces por Entorno
+### Matriz Oficial de Enlaces por Entorno (PROD, QA, LOCAL)
 
-| Entorno | Estado | URL Base del Servicio | Swagger OpenAPI UI | Health Check |
-| :--- | :---: | :--- | :--- | :--- |
-| **Desarrollo Local (DEV)** | Local | `http://localhost:8084/api/v1` | [Swagger UI Local](http://localhost:8084/api/v1/swagger-ui.html) | [`/health`](http://localhost:8084/api/v1/health) |
+| Entorno | Estado | Propósito | URL Base del Servicio | Swagger OpenAPI UI | Health Check |
+| :--- | :---: | :--- | :--- | :--- | :--- |
+| **Producción (PROD)** | Próximo Sprint | Despliegue productivo de StyleRadar | Próximo Sprint | Próximo Sprint | Próximo Sprint |
+| **Calidad / Pruebas (QA)** | Próximo Sprint | Pruebas integradas del Sprint | Próximo Sprint | Próximo Sprint | Próximo Sprint |
+| **Desarrollo Local (DEV)** | Local | Entorno de desarrollo local | `http://localhost:8084/api/v1` | [Swagger UI Local](http://localhost:8084/api/v1/swagger-ui.html) | [`/health`](http://localhost:8084/api/v1/health) |
 
 * **Especificación OpenAPI:** `http://localhost:8084/api/v1/v3/api-docs`
 
@@ -289,14 +291,6 @@ src/main/java/edu/dosw/styleradar/inventario/
 | :------: | :---------------- | :------------------ | :------------ | :----------: |
 |  `GET`   | `/api/v1/health`  | Estado del servicio | Público       |    `200`     |
 
-### Funcionalidades que Cubrirá el Servicio
-
-| Requerimiento | Funcionalidad |
-| :--- | :--- |
-| `SR-RF-52` | Registrar tallas disponibles de una prenda |
-| `SR-RF-56` | Actualizar disponibilidad por talla |
-| `SR-RF-57` | Ocultar prenda agotada de los resultados disponibles |
-
 ---
 
 <a id="5-eventos-que-publica-y-consume"></a>
@@ -305,7 +299,7 @@ src/main/java/edu/dosw/styleradar/inventario/
 
 La comunicación asíncrona entre microservicios se realiza a través de **RabbitMQ 3.13.7**.
 
-### Matriz de Eventos
+### Matriz de Eventos AMQP
 
 | Tipo | Evento | Emisor / Receptor | Propósito |
 | :---: | :--- | :--- | :--- |
@@ -343,12 +337,28 @@ La comunicación asíncrona entre microservicios se realiza a través de **Rabbi
 * **Apache Maven:** 3.9+
 * **Docker Engine y Docker Compose**
 
-### Ejecución con Docker
+### Ejecución Local con Maven (Perfil Dev)
 
-El servicio, junto con su base de datos y RabbitMQ, se levanta con Docker a partir de un archivo `.env` creado desde `.env.example`:
+Requiere PostgreSQL y RabbitMQ disponibles en las direcciones definidas en el archivo `.env`, creado a partir de `.env.example`.
+
+```bash
+git clone https://github.com/StyleRadar1/RST-Inventory-Service.git
+cd RST-Inventory-Service
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+### Ejecución Contenerizada Completa con Docker
+
+El servicio, junto con su base de datos y RabbitMQ, se levanta con Docker a partir del archivo `.env`:
 
 ```bash
 docker compose up -d --build
+```
+
+### Comprobación de Salud (Health Check)
+
+```bash
+curl http://localhost:8084/api/v1/health
 ```
 
 <div align="center">
@@ -396,6 +406,14 @@ Las variables se definen en `.env`, que no se versiona. La plantilla `.env.examp
 
 Las pruebas unitarias validan el dominio y los casos de uso, y las de integración validan la persistencia y la mensajería. Se exige una cobertura mínima del **85 %**, verificada con **JaCoCo** en cada ejecución del pipeline.
 
+### Comandos de Ejecución de Pruebas
+
+```bash
+./mvnw clean verify
+```
+
+Este comando ejecuta las pruebas, genera el reporte de cobertura y verifica el mínimo del 85 %.
+
 * **Ruta del Reporte HTML:** `target/site/jacoco/index.html`
 
 <div align="center">
@@ -414,7 +432,7 @@ Las pruebas unitarias validan el dominio y los casos de uso, y las de integraci�
   </table>
 </div>
 
-### Pirámide de Pruebas
+### Pirámide de Pruebas Implementada
 
 | Nivel de Prueba | Alcance | Tecnologías | Ubicación en el Código |
 | :--- | :--- | :--- | :--- |
@@ -431,7 +449,14 @@ Las pruebas unitarias validan el dominio y los casos de uso, y las de integraci�
 
 Cada cambio enviado a `master`, `develop` o a una rama `feature/*`, así como cada pull request, pasa por un pipeline de **GitHub Actions** que compila el proyecto, ejecuta las pruebas, verifica la cobertura, realiza el análisis estático del código y construye la imagen Docker.
 
-### Diagrama del Flujo Automatizado
+### Matriz de Pipelines por Rama Protegida
+
+| Rama | Desencadenador | Etapas |
+| :--- | :--- | :--- |
+| `develop` | Push y pull request | Compilación, pruebas, cobertura, análisis estático e imagen Docker |
+| `master` | Push y pull request | Compilación, pruebas, cobertura, análisis estático e imagen Docker |
+
+### Diagrama del Flujo Automatizado (Pipeline Stages)
 
 ```mermaid
 flowchart LR
@@ -469,7 +494,7 @@ flowchart LR
 
 ## <img src="https://img.shields.io/badge/11-5600EF?style=for-the-badge" height="20" align="absmiddle" /> 11. RAMAS Y CÓMO CONTRIBUIR
 
-### Estructura de Ramas
+### Estructura de Ramas Oficial
 
 ```text
 master                              <-- Versiones estables
@@ -479,7 +504,17 @@ master                              <-- Versiones estables
 
 Los cambios llegan a `develop` y `master` únicamente por pull request, con revisión y el pipeline en verde.
 
-### Checklist para Pull Requests
+### Convención de Commits (*Conventional Commits*)
+
+Todo mensaje de commit sigue el estándar:
+
+```text
+<tipo>(<alcance>): <descripción en español>
+```
+
+Los tipos más usados son `feat`, `fix`, `test`, `docs`, `refactor` y `chore`.
+
+### Checklist Obligatorio para Pull Requests
 
 - [ ] La rama parte de la versión más reciente de `develop`.
 - [ ] Todas las pruebas pasan y la cobertura JaCoCo es mayor o igual al 85 %.
@@ -491,6 +526,8 @@ Los cambios llegan a `develop` y `master` únicamente por pull request, con revi
 <a id="12-enlace-a-la-épica-en-jira"></a>
 
 ## <img src="https://img.shields.io/badge/12-5600EF?style=for-the-badge" height="20" align="absmiddle" /> 12. ENLACE A LA ÉPICA EN JIRA
+
+### Enlaces de Gestión, Repositorios y Evidencias
 
 * **Épica del Microservicio:** [RES-1 · ms-inventario](https://mail-team-nyjtgqcj.atlassian.net/browse/RES-1)
 * **Tablero del Equipo:** [Restrepo-StyleRadar (RES)](https://mail-team-nyjtgqcj.atlassian.net/jira/software/projects/RES/boards/76)
