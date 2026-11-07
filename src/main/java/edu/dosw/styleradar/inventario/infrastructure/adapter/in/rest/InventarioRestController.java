@@ -1,5 +1,6 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
+import edu.dosw.styleradar.inventario.application.dto.ActualizarDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.DisponibilidadPrendaResponseDTO;
@@ -28,6 +29,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -132,7 +134,7 @@ public class InventarioRestController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "Ajustar stock físico de una talla",
+    @Operation(summary = "Ajustar stock físico de una talla por ID de item",
             description = "Fija manualmente las unidades disponibles de una variante existente")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Stock ajustado exitosamente",
@@ -150,6 +152,33 @@ public class InventarioRestController {
             @Valid @RequestBody AjustarStockCommand command) {
         AjustarStockCommand comandoAjustado = new AjustarStockCommand(id, command.talla(), command.nuevaCantidad());
         StockItemResponseDTO response = ajustarStockUseCase.ejecutar(comandoAjustado);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Modificar de forma independiente la disponibilidad por talla (SR-RF-56 / RES-7)",
+            description = "Permite al administrador modificar directamente las unidades de una talla para una prenda en su sede")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Disponibilidad actualizada exitosamente",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = StockItemResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Unidades negativas o talla inválida",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
+            @ApiResponse(responseCode = "403", description = "Sede suspendida por mora",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
+            @ApiResponse(responseCode = "404", description = "Prenda, sede o talla no registrada",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+    })
+    @PatchMapping("/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}")
+    public ResponseEntity<StockItemResponseDTO> actualizarDisponibilidadTalla(
+            @Parameter(description = "Identificador UUID de la prenda", required = true)
+            @PathVariable UUID prendaId,
+            @Parameter(description = "Identificador UUID de la sede", required = true)
+            @PathVariable UUID sedeId,
+            @Parameter(description = "Talla tipificada a modificar", required = true)
+            @PathVariable String talla,
+            @Valid @RequestBody ActualizarDisponibilidadDTO request) {
+        StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
+                prendaId, sedeId, talla, request.unidades());
         return ResponseEntity.ok(response);
     }
 

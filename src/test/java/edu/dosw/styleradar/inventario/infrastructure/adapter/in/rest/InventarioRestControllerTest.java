@@ -1,6 +1,7 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.dosw.styleradar.inventario.application.dto.ActualizarDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.DisponibilidadPrendaResponseDTO;
@@ -39,9 +40,11 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -157,6 +160,28 @@ class InventarioRestControllerTest {
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stockDisponible").value(15));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/inventario/prenda/{prendaId}/sede/{sedeId}/tallas/{talla} modifica disponibilidad (RES-7)")
+    void actualizarDisponibilidadTallaExitoso() throws Exception {
+        UUID prendaId = UUID.randomUUID();
+        UUID sedeId = UUID.randomUUID();
+        ActualizarDisponibilidadDTO request = new ActualizarDisponibilidadDTO(20);
+
+        StockItemResponseDTO response = new StockItemResponseDTO(
+                UUID.randomUUID(), prendaId, sedeId, TipoPrenda.ROPA, "M", 20, 0,
+                EstadoItem.DISPONIBLE, true, Instant.now());
+
+        when(ajustarStockUseCase.actualizarPorPrendaYSede(eq(prendaId), eq(sedeId), eq("M"), eq(20)))
+                .thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/inventario/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}", prendaId, sedeId, "M")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.talla").value("M"))
+                .andExpect(jsonPath("$.stockDisponible").value(20));
     }
 
     @Test

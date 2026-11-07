@@ -107,6 +107,17 @@ public class InventarioApplicationService implements RegistrarStockUseCase, Regi
     }
 
     @Override
+    public StockItemResponseDTO actualizarPorPrendaYSede(UUID prendaId, UUID sedeId, String tallaStr, Integer nuevasUnidades) {
+        Instant ahora = Instant.now();
+        StockItem stockItem = buscarPorPrendaYSede(prendaId, sedeId);
+        Talla talla = Talla.desde(tallaStr, stockItem.getTipoPrenda());
+
+        stockItem.actualizarStockFisico(talla, cantidadDe(nuevasUnidades), ahora);
+        StockItem guardado = guardarYPublicar(stockItem);
+        return construirRespuesta(guardado, talla, ahora);
+    }
+
+    @Override
     public ReservaResponseDTO reservar(ReservarStockCommand command) {
         Instant ahora = Instant.now();
         StockItem stockItem = buscarPorPrendaYSede(command.prendaId(), command.sedeId());
