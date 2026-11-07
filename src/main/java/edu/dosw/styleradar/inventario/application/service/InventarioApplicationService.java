@@ -3,7 +3,9 @@ package edu.dosw.styleradar.inventario.application.service;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.DisponibilidadPrendaResponseDTO;
+import edu.dosw.styleradar.inventario.application.dto.ItemTallaCantidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.LiberarReservaCommand;
+import edu.dosw.styleradar.inventario.application.dto.RegistrarLoteStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.RegistrarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
@@ -13,6 +15,7 @@ import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
 import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.application.port.in.RegistrarLoteStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.RegistrarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.SuspenderInventarioUseCase;
 import edu.dosw.styleradar.inventario.application.port.out.StockEventPublisherPort;
@@ -30,7 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -39,8 +44,8 @@ import java.util.UUID;
  */
 @Service
 @Transactional
-public class InventarioApplicationService implements RegistrarStockUseCase, AjustarStockUseCase,
-        GestionarReservaUseCase, ConsultarStockUseCase, SuspenderInventarioUseCase {
+public class InventarioApplicationService implements RegistrarStockUseCase, RegistrarLoteStockUseCase,
+        AjustarStockUseCase, GestionarReservaUseCase, ConsultarStockUseCase, SuspenderInventarioUseCase {
 
     static final Duration DURACION_RESERVA = Duration.ofMinutes(15);
 
@@ -66,6 +71,28 @@ public class InventarioApplicationService implements RegistrarStockUseCase, Ajus
         stockItem.registrarTalla(talla, cantidadDe(command.cantidad()), ahora);
         StockItem guardado = guardarYPublicar(stockItem);
         return construirRespuesta(guardado, talla, ahora);
+    }
+
+    @Override
+    public DisponibilidadPrendaResponseDTO registrarLote(RegistrarLoteStockCommand command) {
+        Instant ahora = Instant.now();
+        Instant fechaPub = command.fechaPublicacion() == null ? ahora : command.fechaPublicacion();
+
+        StockItem stockItem = stockRepository
+                .buscarPorPrendaYSede(command.prendaId(), command.sedeId())
+                .orElseGet(() -> StockItem.crear(command.prendaId(), command.sedeId(),
+                        command.tipoPrenda(), fechaPub, ahora));
+
+        Map<Talla, Cantidad> tallasConCantidad = new LinkedHashMap<>();
+        for (ItemTallaCantidadDTO itemDTO : command.tallas()) {
+            Talla talla = Talla.desde(itemDTO.talla(), command.tipoPrenda());
+            tallasConCantidad.put(talla, Cantidad.de(itemDTO.cantidad()));
+        }
+
+        stockItem.registrarTallasLote(tallasConCantidad, ahora);
+        guardarYPublicar(stockItem);
+
+        return consultarPorPrenda(command.prendaId());
     }
 
     @Override

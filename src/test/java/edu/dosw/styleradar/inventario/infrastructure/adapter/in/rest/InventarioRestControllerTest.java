@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.DisponibilidadPrendaResponseDTO;
+import edu.dosw.styleradar.inventario.application.dto.ItemTallaCantidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.LiberarReservaCommand;
+import edu.dosw.styleradar.inventario.application.dto.RegistrarLoteStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.RegistrarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
@@ -14,14 +16,13 @@ import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
 import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.application.port.in.RegistrarLoteStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.RegistrarStockUseCase;
-import edu.dosw.styleradar.inventario.domain.exception.CantidadInvalidaException;
 import edu.dosw.styleradar.inventario.domain.exception.InventarioSuspendidoException;
 import edu.dosw.styleradar.inventario.domain.exception.ResourceNotFoundException;
 import edu.dosw.styleradar.inventario.domain.exception.StockInsuficienteException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaConUnidadesException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaInvalidaException;
-import edu.dosw.styleradar.inventario.domain.exception.TallaNoRegistradaException;
 import edu.dosw.styleradar.inventario.domain.model.EstadoItem;
 import edu.dosw.styleradar.inventario.domain.model.TipoPrenda;
 import org.junit.jupiter.api.DisplayName;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -59,6 +59,9 @@ class InventarioRestControllerTest {
 
     @MockBean
     private RegistrarStockUseCase registrarStockUseCase;
+
+    @MockBean
+    private RegistrarLoteStockUseCase registrarLoteStockUseCase;
 
     @MockBean
     private AjustarStockUseCase ajustarStockUseCase;
@@ -115,6 +118,27 @@ class InventarioRestControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.talla").value("M"))
                 .andExpect(jsonPath("$.stockDisponible").value(10));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/inventario/lote registra conjunto de tallas y retorna 201 Created (RES-6)")
+    void registrarLoteStockExitoso() throws Exception {
+        UUID prendaId = UUID.randomUUID();
+        UUID sedeId = UUID.randomUUID();
+        RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
+                prendaId, sedeId, TipoPrenda.ROPA,
+                List.of(new ItemTallaCantidadDTO("M", 10)), Instant.now());
+
+        DisponibilidadPrendaResponseDTO response = new DisponibilidadPrendaResponseDTO(
+                prendaId, TipoPrenda.ROPA, EstadoItem.DISPONIBLE, 10, List.of());
+
+        when(registrarLoteStockUseCase.registrarLote(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/inventario/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(command)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.prendaId").value(prendaId.toString()));
     }
 
     @Test
@@ -199,7 +223,6 @@ class InventarioRestControllerTest {
     @Test
     @DisplayName("Validación Bean Validation retorna 400 Bad Request con mapa de errores")
     void validacionCamposRetorna400() throws Exception {
-        // Objeto sin prendaId ni sedeId
         RegistrarStockCommand commandInvalido = new RegistrarStockCommand(
                 null, null, TipoPrenda.ROPA, "", -1, null);
 
