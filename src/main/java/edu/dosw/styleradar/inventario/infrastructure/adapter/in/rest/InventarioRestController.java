@@ -10,6 +10,7 @@ import edu.dosw.styleradar.inventario.application.dto.RegistrarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
+import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
@@ -37,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -94,6 +96,36 @@ public class InventarioRestController {
             @PathVariable UUID prendaId) {
         DisponibilidadPrendaResponseDTO response = consultarStockUseCase.consultarPorPrenda(prendaId);
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Verificar disponibilidad para catálogo y búsqueda (SR-RF-57 / RES-8)",
+            description = "Indica si la prenda debe mostrarse u ocultarse de los resultados disponibles según existencias históricas")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Verificación exitosa",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = VerificacionDisponibilidadDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Prenda no encontrada",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+    })
+    @GetMapping("/prenda/{prendaId}/disponibilidad")
+    public ResponseEntity<VerificacionDisponibilidadDTO> verificarDisponibilidad(
+            @Parameter(description = "Identificador UUID de la prenda", required = true)
+            @PathVariable UUID prendaId) {
+        VerificacionDisponibilidadDTO response = consultarStockUseCase.verificarDisponibilidad(prendaId);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Listar IDs de prendas con stock disponible por sede (SR-RF-57 / RES-8)",
+            description = "Retorna exclusivamente las prendas no agotadas que deben ser mostradas en el radar de la sede")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de prendas disponibles retornada")
+    })
+    @GetMapping("/sedes/{sedeId}/disponibles")
+    public ResponseEntity<List<UUID>> listarPrendasDisponiblesPorSede(
+            @Parameter(description = "Identificador UUID de la sede", required = true)
+            @PathVariable UUID sedeId) {
+        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId);
+        return ResponseEntity.ok(disponibles);
     }
 
     @Operation(summary = "Registrar stock inicial de una talla",

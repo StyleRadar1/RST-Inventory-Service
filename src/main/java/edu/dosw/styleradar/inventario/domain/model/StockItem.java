@@ -180,6 +180,10 @@ public class StockItem {
         this.activo = true;
     }
 
+    public boolean estaAgotada() {
+        return getStockDisponibleTotal() == 0;
+    }
+
     public EstadoItem calcularEstado(Instant ahora) {
         if (!activo) {
             return EstadoItem.SUSPENDIDO;

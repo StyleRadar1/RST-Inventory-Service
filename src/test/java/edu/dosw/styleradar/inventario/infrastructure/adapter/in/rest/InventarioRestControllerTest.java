@@ -14,6 +14,7 @@ import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.SedeStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
+import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
@@ -99,6 +100,35 @@ class InventarioRestControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.prendaId").value(prendaId.toString()))
                 .andExpect(jsonPath("$.stockDisponibleTotal").value(10));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/inventario/prenda/{prendaId}/disponibilidad retorna verificación para catálogo (RES-8)")
+    void verificarDisponibilidadExitoso() throws Exception {
+        UUID prendaId = UUID.randomUUID();
+        VerificacionDisponibilidadDTO response = new VerificacionDisponibilidadDTO(
+                prendaId, false, EstadoItem.AGOTADA, 0);
+
+        when(consultarStockUseCase.verificarDisponibilidad(prendaId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/inventario/prenda/{prendaId}/disponibilidad", prendaId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prendaId").value(prendaId.toString()))
+                .andExpect(jsonPath("$.disponibleParaVenta").value(false))
+                .andExpect(jsonPath("$.estado").value("AGOTADA"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/inventario/sedes/{sedeId}/disponibles retorna lista de IDs no agotados (RES-8)")
+    void listarPrendasDisponiblesPorSedeExitoso() throws Exception {
+        UUID sedeId = UUID.randomUUID();
+        UUID prendaId = UUID.randomUUID();
+
+        when(consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId)).thenReturn(List.of(prendaId));
+
+        mockMvc.perform(get("/api/v1/inventario/sedes/{sedeId}/disponibles", sedeId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
     }
 
     @Test

@@ -56,6 +56,15 @@ public class PostgreSqlStockRepositoryAdapter implements StockRepositoryPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<StockItem> buscarDisponiblesPorSede(UUID sedeId) {
+        return repository.findBySedeId(sedeId).stream()
+                .map(this::toDomain)
+                .filter(item -> item.isActivo() && !item.estaAgotada())
+                .toList();
+    }
+
+    @Override
     @Transactional
     public StockItem guardar(StockItem stockItem) {
         StockItemJpaEntity entity = repository.findById(stockItem.getId())

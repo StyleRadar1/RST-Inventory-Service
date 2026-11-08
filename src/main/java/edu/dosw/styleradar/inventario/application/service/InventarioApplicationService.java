@@ -12,6 +12,7 @@ import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.SedeStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
+import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
@@ -178,6 +179,35 @@ public class InventarioApplicationService implements RegistrarStockUseCase, Regi
 
         return new DisponibilidadPrendaResponseDTO(prendaId, items.getFirst().getTipoPrenda(),
                 calcularEstadoGeneral(items, ahora), stockTotal, sedes);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public VerificacionDisponibilidadDTO verificarDisponibilidad(UUID prendaId) {
+        Instant ahora = Instant.now();
+        List<StockItem> items = stockRepository.buscarPorPrenda(prendaId);
+        if (items.isEmpty()) {
+            throw new ResourceNotFoundException("No se encontró inventario para la prenda " + prendaId);
+        }
+
+        int stockTotal = items.stream()
+                .filter(StockItem::isActivo)
+                .mapToInt(StockItem::getStockDisponibleTotal)
+                .sum();
+
+        EstadoItem estadoGeneral = calcularEstadoGeneral(items, ahora);
+        boolean disponibleParaVenta = stockTotal > 0 && estadoGeneral != EstadoItem.SUSPENDIDO;
+
+        return new VerificacionDisponibilidadDTO(prendaId, disponibleParaVenta, estadoGeneral, stockTotal);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> listarPrendasDisponiblesPorSede(UUID sedeId) {
+        return stockRepository.buscarDisponiblesPorSede(sedeId).stream()
+                .map(StockItem::getPrendaId)
+                .distinct()
+                .toList();
     }
 
     @Override
