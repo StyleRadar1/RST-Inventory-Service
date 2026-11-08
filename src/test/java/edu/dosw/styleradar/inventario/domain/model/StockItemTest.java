@@ -10,7 +10,6 @@ import edu.dosw.styleradar.inventario.domain.exception.TallaConUnidadesException
 import edu.dosw.styleradar.inventario.domain.exception.TallaInvalidaException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaNoRegistradaException;
 import edu.dosw.styleradar.inventario.domain.valueobject.Cantidad;
-import edu.dosw.styleradar.inventario.domain.valueobject.Talla;
 import edu.dosw.styleradar.inventario.domain.valueobject.TallaCalzado;
 import edu.dosw.styleradar.inventario.domain.valueobject.TallaRopa;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +50,19 @@ class StockItemTest {
         assertThatThrownBy(() -> stockItem.registrarTalla(TallaCalzado.T40, Cantidad.de(5), FECHA_PUBLICACION))
                 .isInstanceOf(TallaInvalidaException.class)
                 .hasMessageContaining("no es compatible");
+    }
+
+    @Test
+    @DisplayName("RES-6 / SR-RF-52: Registrar lote de tallas válidas en StockItem")
+    void registrarTallasLoteValido() {
+        stockItem.registrarTallasLote(Map.of(
+                TallaRopa.S, Cantidad.de(5),
+                TallaRopa.M, Cantidad.de(10)
+        ), FECHA_PUBLICACION);
+
+        assertThat(stockItem.getVariantes()).hasSize(2);
+        assertThat(stockItem.obtenerVariante(TallaRopa.S).getStockDisponible().valor()).isEqualTo(5);
+        assertThat(stockItem.obtenerVariante(TallaRopa.M).getStockDisponible().valor()).isEqualTo(10);
     }
 
     @Test

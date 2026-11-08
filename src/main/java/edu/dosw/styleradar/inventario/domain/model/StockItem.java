@@ -97,6 +97,14 @@ public class StockItem {
         evaluarEventosDeStock(variante, momento);
     }
 
+    public void registrarTallasLote(Map<Talla, Cantidad> tallasConCantidad, Instant ahora) {
+        asegurarActivo();
+        Objects.requireNonNull(tallasConCantidad, "El mapa de tallas no puede ser nulo");
+        tallasConCantidad.keySet().forEach(this::validarCompatibilidadTalla);
+
+        tallasConCantidad.forEach((talla, cantidad) -> registrarTalla(talla, cantidad, ahora));
+    }
+
     public void actualizarStockFisico(Talla talla, Cantidad nuevaCantidad, Instant ahora) {
         asegurarActivo();
         validarCompatibilidadTalla(talla);
@@ -170,6 +178,10 @@ public class StockItem {
 
     public void reactivarSuscripcion() {
         this.activo = true;
+    }
+
+    public boolean estaAgotada() {
+        return getStockDisponibleTotal() == 0;
     }
 
     public EstadoItem calcularEstado(Instant ahora) {

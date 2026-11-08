@@ -1,27 +1,30 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.dosw.styleradar.inventario.application.dto.ActualizarDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.DisponibilidadPrendaResponseDTO;
+import edu.dosw.styleradar.inventario.application.dto.ItemTallaCantidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.LiberarReservaCommand;
+import edu.dosw.styleradar.inventario.application.dto.RegistrarLoteStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.RegistrarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.SedeStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
+import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.application.port.in.RegistrarLoteStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.RegistrarStockUseCase;
-import edu.dosw.styleradar.inventario.domain.exception.CantidadInvalidaException;
 import edu.dosw.styleradar.inventario.domain.exception.InventarioSuspendidoException;
 import edu.dosw.styleradar.inventario.domain.exception.ResourceNotFoundException;
 import edu.dosw.styleradar.inventario.domain.exception.StockInsuficienteException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaConUnidadesException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaInvalidaException;
-import edu.dosw.styleradar.inventario.domain.exception.TallaNoRegistradaException;
 import edu.dosw.styleradar.inventario.domain.model.EstadoItem;
 import edu.dosw.styleradar.inventario.domain.model.TipoPrenda;
 import org.junit.jupiter.api.DisplayName;
@@ -38,10 +41,11 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -59,6 +63,9 @@ class InventarioRestControllerTest {
 
     @MockBean
     private RegistrarStockUseCase registrarStockUseCase;
+
+    @MockBean
+    private RegistrarLoteStockUseCase registrarLoteStockUseCase;
 
     @MockBean
     private AjustarStockUseCase ajustarStockUseCase;
@@ -96,6 +103,35 @@ class InventarioRestControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/inventario/prenda/{prendaId}/disponibilidad retorna verificación para catálogo (RES-8)")
+    void verificarDisponibilidadExitoso() throws Exception {
+        UUID prendaId = UUID.randomUUID();
+        VerificacionDisponibilidadDTO response = new VerificacionDisponibilidadDTO(
+                prendaId, false, EstadoItem.AGOTADA, 0);
+
+        when(consultarStockUseCase.verificarDisponibilidad(prendaId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/inventario/prenda/{prendaId}/disponibilidad", prendaId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prendaId").value(prendaId.toString()))
+                .andExpect(jsonPath("$.disponibleParaVenta").value(false))
+                .andExpect(jsonPath("$.estado").value("AGOTADA"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/inventario/sedes/{sedeId}/disponibles retorna lista de IDs no agotados (RES-8)")
+    void listarPrendasDisponiblesPorSedeExitoso() throws Exception {
+        UUID sedeId = UUID.randomUUID();
+        UUID prendaId = UUID.randomUUID();
+
+        when(consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId)).thenReturn(List.of(prendaId));
+
+        mockMvc.perform(get("/api/v1/inventario/sedes/{sedeId}/disponibles", sedeId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
+    }
+
+    @Test
     @DisplayName("POST /api/v1/inventario registra existencias y retorna 201 Created")
     void registrarStockExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
@@ -118,6 +154,27 @@ class InventarioRestControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/inventario/lote registra conjunto de tallas y retorna 201 Created (RES-6)")
+    void registrarLoteStockExitoso() throws Exception {
+        UUID prendaId = UUID.randomUUID();
+        UUID sedeId = UUID.randomUUID();
+        RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
+                prendaId, sedeId, TipoPrenda.ROPA,
+                List.of(new ItemTallaCantidadDTO("M", 10)), Instant.now());
+
+        DisponibilidadPrendaResponseDTO response = new DisponibilidadPrendaResponseDTO(
+                prendaId, TipoPrenda.ROPA, EstadoItem.DISPONIBLE, 10, List.of());
+
+        when(registrarLoteStockUseCase.registrarLote(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/inventario/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(command)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.prendaId").value(prendaId.toString()));
+    }
+
+    @Test
     @DisplayName("PUT /api/v1/inventario/{id}/ajuste actualiza stock y retorna 200 OK")
     void ajustarStockExitoso() throws Exception {
         UUID itemId = UUID.randomUUID();
@@ -133,6 +190,28 @@ class InventarioRestControllerTest {
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stockDisponible").value(15));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/inventario/prenda/{prendaId}/sede/{sedeId}/tallas/{talla} modifica disponibilidad (RES-7)")
+    void actualizarDisponibilidadTallaExitoso() throws Exception {
+        UUID prendaId = UUID.randomUUID();
+        UUID sedeId = UUID.randomUUID();
+        ActualizarDisponibilidadDTO request = new ActualizarDisponibilidadDTO(20);
+
+        StockItemResponseDTO response = new StockItemResponseDTO(
+                UUID.randomUUID(), prendaId, sedeId, TipoPrenda.ROPA, "M", 20, 0,
+                EstadoItem.DISPONIBLE, true, Instant.now());
+
+        when(ajustarStockUseCase.actualizarPorPrendaYSede(eq(prendaId), eq(sedeId), eq("M"), eq(20)))
+                .thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/inventario/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}", prendaId, sedeId, "M")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.talla").value("M"))
+                .andExpect(jsonPath("$.stockDisponible").value(20));
     }
 
     @Test
@@ -199,7 +278,6 @@ class InventarioRestControllerTest {
     @Test
     @DisplayName("Validación Bean Validation retorna 400 Bad Request con mapa de errores")
     void validacionCamposRetorna400() throws Exception {
-        // Objeto sin prendaId ni sedeId
         RegistrarStockCommand commandInvalido = new RegistrarStockCommand(
                 null, null, TipoPrenda.ROPA, "", -1, null);
 

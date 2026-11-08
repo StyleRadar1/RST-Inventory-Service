@@ -16,5 +16,7 @@ public interface StockRepositoryPort {
 
     List<StockItem> buscarPorSede(UUID sedeId);
 
+    List<StockItem> buscarDisponiblesPorSede(UUID sedeId);
+
     StockItem guardar(StockItem stockItem);
 }

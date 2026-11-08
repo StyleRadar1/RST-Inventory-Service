@@ -1,16 +1,20 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
+import edu.dosw.styleradar.inventario.application.dto.ActualizarDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.DisponibilidadPrendaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.LiberarReservaCommand;
+import edu.dosw.styleradar.inventario.application.dto.RegistrarLoteStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.RegistrarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
+import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.application.port.in.RegistrarLoteStockUseCase;
 import edu.dosw.styleradar.inventario.application.port.in.RegistrarStockUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -26,6 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -33,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -45,15 +51,18 @@ import java.util.UUID;
 public class InventarioRestController {
 
     private final RegistrarStockUseCase registrarStockUseCase;
+    private final RegistrarLoteStockUseCase registrarLoteStockUseCase;
     private final AjustarStockUseCase ajustarStockUseCase;
     private final GestionarReservaUseCase gestionarReservaUseCase;
     private final ConsultarStockUseCase consultarStockUseCase;
 
     public InventarioRestController(RegistrarStockUseCase registrarStockUseCase,
+                                    RegistrarLoteStockUseCase registrarLoteStockUseCase,
                                     AjustarStockUseCase ajustarStockUseCase,
                                     GestionarReservaUseCase gestionarReservaUseCase,
                                     ConsultarStockUseCase consultarStockUseCase) {
         this.registrarStockUseCase = registrarStockUseCase;
+        this.registrarLoteStockUseCase = registrarLoteStockUseCase;
         this.ajustarStockUseCase = ajustarStockUseCase;
         this.gestionarReservaUseCase = gestionarReservaUseCase;
         this.consultarStockUseCase = consultarStockUseCase;
@@ -76,29 +85,7 @@ public class InventarioRestController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Disponibilidad consultada con éxito",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = DisponibilidadPrendaResponseDTO.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "prendaId": "018e3a2b-1111-7000-8000-000000000001",
-                                      "tipoPrenda": "ROPA",
-                                      "estadoGeneral": "DISPONIBLE",
-                                      "stockDisponibleTotal": 10,
-                                      "sedes": [
-                                        {
-                                          "sedeId": "018e3a2b-2222-7000-8000-000000000002",
-                                          "activo": true,
-                                          "variantes": [
-                                            {
-                                              "talla": "M",
-                                              "stockDisponible": 10,
-                                              "stockReservado": 0,
-                                              "estadoVariante": "DISPONIBLE"
-                                            }
-                                          ]
-                                        }
-                                      ]
-                                    }
-                                    """))),
+                            schema = @Schema(implementation = DisponibilidadPrendaResponseDTO.class))),
             @ApiResponse(responseCode = "404", description = "Prenda no encontrada en inventario",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
@@ -111,26 +98,42 @@ public class InventarioRestController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Verificar disponibilidad para catálogo y búsqueda (SR-RF-57 / RES-8)",
+            description = "Indica si la prenda debe mostrarse u ocultarse de los resultados disponibles según existencias históricas")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Verificación exitosa",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = VerificacionDisponibilidadDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Prenda no encontrada",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+    })
+    @GetMapping("/prenda/{prendaId}/disponibilidad")
+    public ResponseEntity<VerificacionDisponibilidadDTO> verificarDisponibilidad(
+            @Parameter(description = "Identificador UUID de la prenda", required = true)
+            @PathVariable UUID prendaId) {
+        VerificacionDisponibilidadDTO response = consultarStockUseCase.verificarDisponibilidad(prendaId);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Listar IDs de prendas con stock disponible por sede (SR-RF-57 / RES-8)",
+            description = "Retorna exclusivamente las prendas no agotadas que deben ser mostradas en el radar de la sede")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de prendas disponibles retornada")
+    })
+    @GetMapping("/sedes/{sedeId}/disponibles")
+    public ResponseEntity<List<UUID>> listarPrendasDisponiblesPorSede(
+            @Parameter(description = "Identificador UUID de la sede", required = true)
+            @PathVariable UUID sedeId) {
+        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId);
+        return ResponseEntity.ok(disponibles);
+    }
+
     @Operation(summary = "Registrar stock inicial de una talla",
-            description = "Registra o actualiza la disponibilidad inicial de una talla para una prenda en una sede física (SR-RF-50)")
+            description = "Registra o actualiza la disponibilidad inicial de una talla para una prenda en una sede física (SR-RF-50 / SR-RF-52)")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Stock registrado exitosamente",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = StockItemResponseDTO.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "id": "018e3a2b-3333-7000-8000-000000000003",
-                                      "prendaId": "018e3a2b-1111-7000-8000-000000000001",
-                                      "sedeId": "018e3a2b-2222-7000-8000-000000000002",
-                                      "tipoPrenda": "ROPA",
-                                      "talla": "M",
-                                      "stockDisponible": 10,
-                                      "stockReservado": 0,
-                                      "estado": "NUEVA_PRENDA",
-                                      "activo": true,
-                                      "fechaActualizacion": "2026-11-04T15:00:00Z"
-                                    }
-                                    """))),
+                            schema = @Schema(implementation = StockItemResponseDTO.class))),
             @ApiResponse(responseCode = "400", description = "Talla incompatible con tipo de prenda o cantidad negativa",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class))),
@@ -140,25 +143,30 @@ public class InventarioRestController {
     })
     @PostMapping
     public ResponseEntity<StockItemResponseDTO> registrarStock(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Comando con prenda, sede, tipo, talla y cantidad inicial", required = true,
-                    content = @Content(schema = @Schema(implementation = RegistrarStockCommand.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "prendaId": "018e3a2b-1111-7000-8000-000000000001",
-                                      "sedeId": "018e3a2b-2222-7000-8000-000000000002",
-                                      "tipoPrenda": "ROPA",
-                                      "talla": "M",
-                                      "cantidad": 10,
-                                      "fechaPublicacion": "2026-11-01T10:00:00Z"
-                                    }
-                                    """)))
             @Valid @RequestBody RegistrarStockCommand command) {
         StockItemResponseDTO response = registrarStockUseCase.ejecutar(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "Ajustar stock físico de una talla",
+    @Operation(summary = "Registrar lote de tallas disponibles (SR-RF-52 / RES-6)",
+            description = "Permite al administrador asociar el conjunto de tallas y stock inicial ofrecido por su establecimiento")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Tallas asociadas exitosamente",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = DisponibilidadPrendaResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Talla incompatible con el tipo de prenda o datos inválidos (SR-RF-52)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
+            @ApiResponse(responseCode = "403", description = "Inventario suspendido por mora en suscripción",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+    })
+    @PostMapping("/lote")
+    public ResponseEntity<DisponibilidadPrendaResponseDTO> registrarLote(
+            @Valid @RequestBody RegistrarLoteStockCommand command) {
+        DisponibilidadPrendaResponseDTO response = registrarLoteStockUseCase.registrarLote(command);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Operation(summary = "Ajustar stock físico de una talla por ID de item",
             description = "Fija manualmente las unidades disponibles de una variante existente")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Stock ajustado exitosamente",
@@ -179,23 +187,39 @@ public class InventarioRestController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Modificar de forma independiente la disponibilidad por talla (SR-RF-56 / RES-7)",
+            description = "Permite al administrador modificar directamente las unidades de una talla para una prenda en su sede")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Disponibilidad actualizada exitosamente",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = StockItemResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Unidades negativas o talla inválida",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
+            @ApiResponse(responseCode = "403", description = "Sede suspendida por mora",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
+            @ApiResponse(responseCode = "404", description = "Prenda, sede o talla no registrada",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+    })
+    @PatchMapping("/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}")
+    public ResponseEntity<StockItemResponseDTO> actualizarDisponibilidadTalla(
+            @Parameter(description = "Identificador UUID de la prenda", required = true)
+            @PathVariable UUID prendaId,
+            @Parameter(description = "Identificador UUID de la sede", required = true)
+            @PathVariable UUID sedeId,
+            @Parameter(description = "Talla tipificada a modificar", required = true)
+            @PathVariable String talla,
+            @Valid @RequestBody ActualizarDisponibilidadDTO request) {
+        StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
+                prendaId, sedeId, talla, request.unidades());
+        return ResponseEntity.ok(response);
+    }
+
     @Operation(summary = "Reservar stock para checkout",
             description = "Bloquea temporalmente unidades disponibles para un proceso de compra (SR-RF-53)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reserva exitosa",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ReservaResponseDTO.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "reservaExitosa": true,
-                                      "prendaId": "018e3a2b-1111-7000-8000-000000000001",
-                                      "sedeId": "018e3a2b-2222-7000-8000-000000000002",
-                                      "talla": "M",
-                                      "unidadesReservadas": 2,
-                                      "stockDisponibleRestante": 8,
-                                      "expiracionReserva": "2026-11-04T15:15:00Z"
-                                    }
-                                    """))),
+                            schema = @Schema(implementation = ReservaResponseDTO.class))),
             @ApiResponse(responseCode = "400", description = "Parámetros de reserva inválidos",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
             @ApiResponse(responseCode = "404", description = "Inventario no encontrado",
