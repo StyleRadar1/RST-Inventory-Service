@@ -1,15 +1,13 @@
 server:
-  port: ${SERVER_PORT:8084}
-  servlet:
-    context-path: /api/v1
+  port: ${SERVER_PORT:8200}
 
 spring:
   application:
     name: ms-inventario
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:styleradar_inventory}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:inventario_db}
+    username: ${DB_USER:styleradar_user}
+    password: ${DB_PASSWORD:secret_dev_pass}
   jpa:
     open-in-view: false
     hibernate:
@@ -21,7 +19,7 @@ spring:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
-    password: ${RABBITMQ_PASSWORD:}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 springdoc:
   api-docs:

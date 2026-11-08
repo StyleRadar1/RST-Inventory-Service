@@ -1,8 +1,12 @@
 package edu.dosw.styleradar.inventario.domain.exception;
 
-public class DomainException extends RuntimeException {
+/**
+ * Excepción base para todas las reglas de negocio del dominio de inventario.
+ * Pertenece al núcleo y no depende de frameworks.
+ */
+public abstract class DomainException extends RuntimeException {
 
-    public DomainException(String message) {
+    protected DomainException(String message) {
         super(message);
     }
 }

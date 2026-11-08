@@ -8,7 +8,7 @@
 
   <p align="center">
     <img src="https://img.shields.io/badge/BOUNDED_CONTEXT-Inventario_por_talla-12063A?style=for-the-badge" alt="Context" />
-    <img src="https://img.shields.io/badge/PUERTO_OFICIAL-8084-5600EF?style=for-the-badge" alt="Port" />
+    <img src="https://img.shields.io/badge/PUERTO_OFICIAL-8200-5600EF?style=for-the-badge" alt="Port" />
     <img src="https://img.shields.io/badge/ARQUITECTURA-HEXAGONAL-16A34A?style=for-the-badge" alt="Hexagonal" />
   </p>
 
@@ -63,7 +63,7 @@
 
 * **Identificador de Servicio:** `ms-inventario`
 * **Paquete Arquitectónico:** `Paquete 2: Catálogo`
-* **Puerto de Escucha Oficial:** `8084`
+* **Puerto de Escucha Oficial:** `8200`
 * **Base de Datos Asignada:** `PostgreSQL 15.8` (`styleradar_inventory`), aislada bajo el patrón *Database-per-Service*.
 * **Bounded Context:** `Inventario por talla`
 
@@ -74,8 +74,8 @@ Este microservicio encapsula exclusivamente la lógica de negocio del inventario
 | Qué HACE este Microservicio (Alcance) | Qué NO HACE este Microservicio (Límites) |
 | :--- | :--- |
 | • Registra las tallas disponibles de cada prenda. | • NO autentica usuarios. |
-| • Actualiza las unidades disponibles por talla. | • NO publica ni edita prendas (delegado a `ms-item-catalogo` en `:8085`). |
-| • Avisa cuando una prenda se agota en todas sus tallas. | • NO gestiona playlists (delegado a `ms-playlist` en `:8087`). |
+| • Actualiza las unidades disponibles por talla. | • NO publica ni edita prendas (delegado a `ms-item-catalogo` en `:8220`). |
+| • Avisa cuando una prenda se agota en todas sus tallas. | • NO gestiona playlists (delegado a `ms-playlist` en `:8260`). |
 | • Garantiza persistencia ACID e idempotencia en su base de datos. | • NO accede directamente a bases de datos de otros microservicios. |
 
 ### Arquetipos de Moda y Personajes de StyleRadar
@@ -176,11 +176,15 @@ flowchart TD
           <img src="https://img.shields.io/badge/DIAGRAMA-COMPONENTES-12063A?style=for-the-badge" alt="Diagrama de componentes" /><br />
           <strong><font color="#5600EF" size="3">DIAGRAMA DE COMPONENTES ESPECÍFICO (HEXAGONAL)</font></strong>
         </p>
-        <p><em>Diagrama pendiente.</em></p>
+        <p>
+          <img src="docs/evidencias/DiagramaComponentesEspecificoInventario.png" width="100%" alt="Diagrama de componentes" /><br />
+        </p>
       </td>
     </tr>
   </table>
 </div>
+
+El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan desde el API Gateway a `InventarioRestController` y los eventos de otros servicios llegan por RabbitMQ a `OrdenPagoEventListener` y `SuscripcionEventListener` (adaptadores de entrada). Estos solo conocen los casos de uso (puertos de entrada): registrar, ajustar y consultar existencias, gestionar reservas y suspender el inventario, que implementa `InventarioApplicationService`. El servicio usa los puertos de salida para guardar las existencias en PostgreSQL (`StockRepositoryPort`), publicar los eventos de stock en RabbitMQ (`StockEventPublishPort`) y consultar la caché en Redis (`StockCachePort`). Las dependencias apuntan hacia adentro, por lo que el dominio no conoce Spring, JPA ni HTTP.
 
 ### Diagrama de Clases
 
@@ -192,11 +196,15 @@ flowchart TD
           <img src="https://img.shields.io/badge/DIAGRAMA-CLASES-12063A?style=for-the-badge" alt="Diagrama de clases" /><br />
           <strong><font color="#5600EF" size="3">DIAGRAMA DE CLASES DEL DOMINIO</font></strong>
         </p>
-        <p><em>Diagrama pendiente.</em></p>
+        <p>
+          <img src="docs/evidencias/DiagramadeClasesInventario.png" width="100%" alt="Diagrama de clases" /><br />
+        </p>
       </td>
     </tr>
   </table>
 </div>
+
+El agregado principal es `StockItem`, que representa las existencias de una prenda en una sede y agrupa sus `InventarioVariante`, una por cada talla. Cada variante maneja las unidades disponibles y reservadas con el objeto de valor `Cantidad`, y su talla con `Talla`, que puede ser `TallaRopa` (XS a XXL) o `TallaCalzado` (34 a 45) según el `TipoPrenda`. Los métodos del agregado cubren registrar tallas, actualizar existencias, reservar, confirmar o liberar una reserva y suspender el inventario por mora. El estado de la prenda (disponible, últimas unidades, nueva, agotada o suspendida) se calcula a partir de las existencias, y al quedar pocas o ninguna unidad se generan los eventos de dominio `StockBajoEvent` y `StockAgotadoEvent`.
 
 ### Diagrama de Base de Datos
 
@@ -208,11 +216,15 @@ flowchart TD
           <img src="https://img.shields.io/badge/DIAGRAMA-BASE_DE_DATOS-12063A?style=for-the-badge" alt="Diagrama de base de datos" /><br />
           <strong><font color="#5600EF" size="3">MODELO DE DATOS (POSTGRESQL)</font></strong>
         </p>
-        <p><em>Diagrama pendiente.</em></p>
+        <p>
+          <img src="docs/evidencias/DiagramaEntidadRelacionInventario.png" width="100%" alt="Diagrama de base de datos" /><br />
+        </p>
       </td>
     </tr>
   </table>
 </div>
+
+Se usa PostgreSQL porque las existencias requieren consistencia en cada reserva y venta. La tabla `inventario_items` guarda una fila por prenda y sede, con su tipo, estado, umbral de últimas unidades y si está activa; `inventario_tallas` guarda las unidades disponibles y reservadas de cada talla, en relación uno a muchos con `inventario_items`. La prenda y la sede se guardan solo por su identificador, ya que pertenecen a otros servicios (*Database-per-Service*).
 
 ### Estructura Oficial de Paquetes en `src/main/java/`
 
@@ -265,9 +277,9 @@ src/main/java/edu/dosw/styleradar/inventario/
 | :--- | :---: | :--- | :--- | :--- | :--- |
 | **Producción (PROD)** | Próximo Sprint | Despliegue productivo de StyleRadar | Próximo Sprint | Próximo Sprint | Próximo Sprint |
 | **Calidad / Pruebas (QA)** | Próximo Sprint | Pruebas integradas del Sprint | Próximo Sprint | Próximo Sprint | Próximo Sprint |
-| **Desarrollo Local (DEV)** | Local | Entorno de desarrollo local | `http://localhost:8084/api/v1` | [Swagger UI Local](http://localhost:8084/api/v1/swagger-ui.html) | [`/health`](http://localhost:8084/api/v1/health) |
+| **Desarrollo Local (DEV)** | Local | Entorno de desarrollo local | `http://localhost:8200/api/v1` | [Swagger UI Local](http://localhost:8200/api/v1/swagger-ui.html) | [`/health`](http://localhost:8200/api/v1/health) |
 
-* **Especificación OpenAPI:** `http://localhost:8084/api/v1/v3/api-docs`
+* **Especificación OpenAPI:** `http://localhost:8200/api/v1/v3/api-docs`
 
 <div align="center">
   <table width="100%" style="margin: 18px 0; border: 2px dashed #5600EF; border-radius: 8px; background-color: #FBFBFE;">
@@ -287,9 +299,15 @@ src/main/java/edu/dosw/styleradar/inventario/
 
 ### Tabla de Endpoints Expuestos
 
-|  Método  | Endpoint          | Descripción         | Rol Requerido | Códigos HTTP |
-| :------: | :---------------- | :------------------ | :------------ | :----------: |
-|  `GET`   | `/api/v1/health`  | Estado del servicio | Público       |    `200`     |
+| Método | Endpoint | Descripción | Rol Requerido | Códigos HTTP |
+| :---: | :--- | :--- | :--- | :---: |
+| `GET` | `/api/v1/inventario/prenda/{prendaId}` | Consultar las existencias y tallas disponibles de una prenda | Autenticado | `200`, `404` |
+| `POST` | `/api/v1/inventario` | Registrar las existencias iniciales por sede y talla | `TIENDA`, `ADMIN` | `201`, `400`, `409` |
+| `PUT` | `/api/v1/inventario/{id}/ajuste` | Ajustar las existencias de una talla | `TIENDA`, `ADMIN` | `200`, `400`, `404` |
+| `POST` | `/api/v1/inventario/reserva` | Reservar unidades durante una compra | Interno | `200`, `400`, `409` |
+| `POST` | `/api/v1/inventario/reserva/confirmar` | Confirmar la salida de las unidades reservadas | Interno | `200`, `400`, `404` |
+| `POST` | `/api/v1/inventario/reserva/liberar` | Liberar las unidades reservadas por cancelación | Interno | `200`, `400`, `404` |
+| `GET` | `/api/v1/health` | Estado del servicio | Público | `200` |
 
 ---
 
@@ -358,7 +376,7 @@ docker compose up -d --build
 ### Comprobación de Salud (Health Check)
 
 ```bash
-curl http://localhost:8084/api/v1/health
+curl http://localhost:8200/api/v1/health
 ```
 
 <div align="center">
@@ -387,7 +405,7 @@ Las variables se definen en `.env`, que no se versiona. La plantilla `.env.examp
 
 | Variable | Descripción | Valor por Defecto |
 | :--- | :--- | :--- |
-| `SERVER_PORT` | Puerto del servicio | `8084` |
+| `SERVER_PORT` | Puerto del servicio | `8200` |
 | `DB_HOST` | Host de PostgreSQL | `localhost` |
 | `DB_PORT` | Puerto de PostgreSQL | `5432` |
 | `DB_NAME` | Nombre de la base de datos | `styleradar_inventory` |
@@ -531,6 +549,7 @@ Los tipos más usados son `feat`, `fix`, `test`, `docs`, `refactor` y `chore`.
 
 * **Épica del Microservicio:** [RES-1 · ms-inventario](https://mail-team-nyjtgqcj.atlassian.net/browse/RES-1)
 * **Tablero del Equipo:** [Restrepo-StyleRadar (RES)](https://mail-team-nyjtgqcj.atlassian.net/jira/software/projects/RES/boards/76)
+* **Documento Técnico del Servicio:** [Documento técnico de ms-inventario](docs/DocumentoTecnicoInventario.html)
 
 <div align="center">
   <table width="100%" style="margin: 18px 0; border: 2px dashed #5600EF; border-radius: 8px; background-color: #FBFBFE;">
