@@ -11,9 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HealthControllerTest {
 
     @Test
-    void healthReturnsServiceUp() {
+    void healthReturnsServiceUpOnPort8200() {
         HealthController controller = new HealthController();
-
         ResponseEntity<Map<String, Object>> response = controller.health();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

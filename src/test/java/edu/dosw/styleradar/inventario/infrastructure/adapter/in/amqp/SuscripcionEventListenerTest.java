@@ -1,6 +1,6 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.amqp;
 
-import edu.dosw.styleradar.inventario.application.port.in.SuspenderInventarioUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.SuspenderInventarioUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -2,7 +2,7 @@ package edu.dosw.styleradar.inventario.infrastructure.adapter.in.amqp;
 
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.LiberarReservaCommand;
-import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
 import edu.dosw.styleradar.inventario.infrastructure.config.RabbitMqConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,9 +12,6 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Escucha eventos de orden de pago para confirmar o liberar reservas de stock.
- */
 @Component
 public class OrdenPagoEventListener {
 

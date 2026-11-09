@@ -1,9 +1,8 @@
-package edu.dosw.styleradar.inventario.application.port.in;
+package edu.dosw.styleradar.inventario.domain.port.in;
 
 import edu.dosw.styleradar.inventario.application.dto.RegistrarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 
 public interface RegistrarStockUseCase {
-
     StockItemResponseDTO ejecutar(RegistrarStockCommand command);
 }
