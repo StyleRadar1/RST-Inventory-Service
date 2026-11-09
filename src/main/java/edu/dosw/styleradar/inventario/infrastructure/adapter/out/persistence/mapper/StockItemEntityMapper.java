@@ -7,6 +7,8 @@ import edu.dosw.styleradar.inventario.domain.valueobject.Talla;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.entity.InventarioVarianteJpaEntity;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.entity.StockItemJpaEntity;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -16,6 +18,14 @@ import java.util.UUID;
 
 @Mapper(componentModel = "spring")
 public interface StockItemEntityMapper {
+
+    /**
+     * Método abstracto generado por MapStruct: mapea y copia los campos de cabecera hacia la entidad JPA.
+     */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "variantes", ignore = true)
+    @Mapping(target = "estado", expression = "java(domain.calcularEstado(java.time.Instant.now()))")
+    void copiarCabecera(StockItem domain, @MappingTarget StockItemJpaEntity entity);
 
     default StockItem toDomain(StockItemJpaEntity entity) {
         if (entity == null) {
@@ -39,14 +49,8 @@ public interface StockItemEntityMapper {
         if (entity == null || domain == null) {
             return;
         }
-        entity.setPrendaId(domain.getPrendaId());
-        entity.setSedeId(domain.getSedeId());
-        entity.setTipoPrenda(domain.getTipoPrenda());
-        entity.setEstado(domain.calcularEstado(Instant.now()));
-        entity.setUmbralUltimasUnidades(domain.getUmbralUltimasUnidades());
-        entity.setActivo(domain.isActivo());
-        entity.setFechaPublicacion(domain.getFechaPublicacion());
-        entity.setFechaActualizacion(domain.getFechaActualizacion());
+        // Delegación en el método abstracto generado por MapStruct
+        copiarCabecera(domain, entity);
 
         Map<String, InventarioVariante> variantesDominio = domain.getVariantes();
         Map<String, InventarioVarianteJpaEntity> existentes = new LinkedHashMap<>();

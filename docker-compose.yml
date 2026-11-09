@@ -3,7 +3,7 @@ services:
     build: .
     container_name: ms-inventario
     ports:
-      - "${SERVER_PORT:-8084}:8084"
+      - "${SERVER_PORT:-8200}:8200"
     env_file:
       - .env
     environment:
