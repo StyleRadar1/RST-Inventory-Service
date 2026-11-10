@@ -85,11 +85,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # Prueba que el Dockerfile construya limpiamente sin subirlo
-      - name: Construir imagen de prueba (Dry-run)
+      - name: Construir imagen (Dry-run de prueba)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
-          tags: ${{ github.event.repository.name }}:test
+          tags: test-image:test    # <-- 100% en minúsculas, infalible
           cache-from: type=gha
           cache-to: type=gha,mode=max
