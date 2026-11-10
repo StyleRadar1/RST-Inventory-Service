@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,12 +21,9 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI openApi() {
         return new OpenAPI()
-                // 1. CLAVE: La ruta relativa "/" obliga a Swagger a consumir el mismo dominio donde está abierto
-                // (Si estás en Azure usará https://rst-inventory-service-qa..., si estás en local usará http://localhost:8200)
                 .servers(List.of(
-                        new Server().url("/").description("Servidor Actual (Local / QA / PROD)")
+                        new Server().url("/").description("Servidor Actual (Relativo)")
                 ))
-                // 2. Información del microservicio para la documentación técnica
                 .info(new Info()
                         .title("RST-Inventory-Service")
                         .version("1.0.0")
@@ -34,7 +32,6 @@ public class OpenApiConfig {
                         .contact(new Contact()
                                 .name("Equipo Estación RESTrepo")
                                 .email("daniel.mmartinez@mail.escuelaing.edu.co")))
-                // 3. Soporte para Autenticación JWT en Swagger UI
                 .components(new Components()
                         .addSecuritySchemes(SECURITY_SCHEME_NAME, new SecurityScheme()
                                 .name(SECURITY_SCHEME_NAME)
@@ -43,5 +40,16 @@ public class OpenApiConfig {
                                 .bearerFormat("JWT")
                                 .description("Ingrese el token JWT (Bearer) emitido por ms-auth.")))
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME));
+    }
+
+    /**
+     * Sobrescribe de forma obligatoria la lista de servidores generada por Springdoc
+     * fijándola en '/' para que Swagger UI siempre ejecute peticiones relativas al host público actual.
+     */
+    @Bean
+    public OpenApiCustomizer relativeServerOpenApiCustomizer() {
+        return openApi -> openApi.setServers(List.of(
+                new Server().url("/").description("Servidor Actual (Relativo)")
+        ));
     }
 }
