@@ -1,50 +1,95 @@
-name: CI
+name: CI - Integración Continua y Calidad
 
 on:
-  push:
-    branches: [master, develop, 'feature/**']
   pull_request:
-    branches: [master, develop]
+    branches:
+      - master
+      - main
+      - develop
+  push:
+    branches:
+      - 'feature/**'
+      - 'bugfix/**'
+      - 'hotfix/**'
   workflow_dispatch:
 
-jobs:
-  build:
-    name: Build, pruebas, análisis estático y cobertura
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
 
-      - uses: actions/setup-java@v4
+jobs:
+  test-and-quality:
+    name: Build, Tests & Quality Gate
+    runs-on: ubuntu-latest
+
+    env:
+      SPRING_PROFILES_ACTIVE: test
+      DB_URL: jdbc:h2:mem:testdb
+      DB_USERNAME: sa
+      DB_PASSWORD: sa
+
+    steps:
+      - name: Checkout del código (Historial completo para Sonar)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar JDK 21 (Temurin)
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
-      - name: Compilar
-        run: mvn -B -ntp clean compile
+      - name: Permisos de ejecución a mvnw
+        run: chmod +x mvnw
 
-      - name: Pruebas, cobertura y análisis estático
-        run: mvn -B -ntp verify
+      # 'verify' corre tests y valida la regla estricta de JaCoCo (falla si < 85%)
+      - name: Ejecutar pruebas y validar JaCoCo (>= 85%)
+        run: ./mvnw -B -ntp clean verify
 
-      - name: Publicar reporte de cobertura
+      - name: Publicar reporte de resultados de pruebas
+        uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: jacoco-report
+          files: '**/target/surefire-reports/*.xml'
+          check_name: 'Resultados de Pruebas Unitarias'
+          comment_mode: always
+
+      # Ejecuta SonarQube si existe el secreto, de lo contrario continúa sin romper
+      - name: Análisis Estático SonarQube
+        continue-on-error: true
+        run: ./mvnw -B -ntp sonar:sonar -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Subir reporte HTML de JaCoCo como artefacto
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-report-${{ github.sha }}
           path: target/site/jacoco/
+          retention-days: 7
 
-  docker:
-    name: Imagen Docker
-    needs: build
+  docker-dry-run:
+    name: Validar compilación de Dockerfile
     runs-on: ubuntu-latest
+    needs: test-and-quality
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout del código
+        uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Construir imagen
+      # Prueba que el Dockerfile construya limpiamente sin subirlo
+      - name: Construir imagen de prueba (Dry-run)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
-          tags: ms-inventario:${{ github.sha }}
+          tags: ${{ github.event.repository.name }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

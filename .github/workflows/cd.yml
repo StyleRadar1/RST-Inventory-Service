@@ -1,0 +1,102 @@
+name: CD - Despliegue Automático Azure
+
+on:
+  push:
+    branches:
+      - develop  # Despliega automáticamente a QA
+      - master   # Despliega automáticamente a PROD
+      - main     # Despliega automáticamente a PROD
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Entorno de despliegue manual (qa o prod)'
+        required: true
+        default: 'qa'
+        type: choice
+        options:
+          - qa
+          - prod
+
+env:
+  # ============================================================================
+  # ÚNICAS 2 VARIABLES QUE CAMBIAN POR CADA MICROSERVICIO:
+  APP_PORT: 8200           # 8200 para inventario | 8260 para playlist
+  DB_NAME: inventario_db   # inventario_db para inventario | playlist_db para playlist
+  # ============================================================================
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    name: Build OCI & Deploy to Azure Container Apps
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # Calcula nombres en minúsculas y sufijos dinámicos (-qa o -prod)
+      - name: Configurar variables dinámicas de entorno
+        id: vars
+        run: |
+          IMAGE_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          APP_LOWER=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          
+          TARGET="qa"
+          if [ "${{ github.ref }}" = "refs/heads/master" ] || [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.event.inputs.target_env }}" = "prod" ]; then
+            TARGET="prod"
+          fi
+          
+          echo "target_env=$TARGET" >> $GITHUB_OUTPUT
+          echo "image_name=$IMAGE_LOWER" >> $GITHUB_OUTPUT
+          echo "app_name=${APP_LOWER}-${TARGET}" >> $GITHUB_OUTPUT
+          echo "image_tag=${TARGET}-latest" >> $GITHUB_OUTPUT
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y Publicar Imagen en GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Iniciar sesión en Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENCIALES_PROD }}
+
+      - name: Crear o Actualizar Container App en Azure (${{ steps.vars.outputs.target_env }})
+        run: |
+          az containerapp up \
+            --name "${{ steps.vars.outputs.app_name }}" \
+            --resource-group STYLE_RADAR_PROD_RG \
+            --location northcentralus \
+            --environment styleradar-cae-prod \
+            --image "${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.image_tag }}" \
+            --target-port ${{ env.APP_PORT }} \
+            --ingress external \
+            --registry-server ${{ env.REGISTRY }} \
+            --registry-username "${{ github.actor }}" \
+            --registry-password "${{ secrets.GITHUB_TOKEN }}" \
+            --env-vars \
+              SERVER_PORT=${{ env.APP_PORT }} \
+              DB_HOST=styleradar-postgres-prod.postgres.database.azure.com \
+              DB_PORT=5432 \
+              DB_NAME=${{ env.DB_NAME }} \
+              DB_USER=styleradar_admin \
+              DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              SPRING_PROFILES_ACTIVE=${{ steps.vars.outputs.target_env }}
