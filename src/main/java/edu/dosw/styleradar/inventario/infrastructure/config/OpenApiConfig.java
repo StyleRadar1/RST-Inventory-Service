@@ -32,9 +32,8 @@ public class OpenApiConfig {
                                 .url("https://github.com/StyleRadar1"))
                         .license(new License().name("Apache 2.0").url("https://www.apache.org/licenses/LICENSE-2.0")))
                 .servers(List.of(
-                        new Server().url("http://localhost:8200").description("Entorno Local"),
-                        new Server().url("https://styleradar-backend-qa.azurewebsites.net").description("Entorno QA"),
-                        new Server().url("https://styleradar-backend-prod.azurewebsites.net").description("Entorno Producción")))
+    new Server().url("/").description("Servidor actual en Azure")
+))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components().addSecuritySchemes("bearerAuth",
                         new SecurityScheme()
