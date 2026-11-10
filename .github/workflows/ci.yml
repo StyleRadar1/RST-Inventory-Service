@@ -11,6 +11,7 @@ on:
       - 'feature/**'
       - 'bugfix/**'
       - 'hotfix/**'
+      - 'ci/**'
   workflow_dispatch:
 
 permissions:
