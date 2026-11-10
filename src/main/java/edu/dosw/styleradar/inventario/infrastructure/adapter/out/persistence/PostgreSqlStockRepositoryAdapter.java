@@ -58,6 +58,14 @@ public class PostgreSqlStockRepositoryAdapter implements StockRepositoryPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<StockItem> buscarPrendasDisponiblesPorTalla(String talla, UUID sedeId) {
+        return repository.buscarPrendasDisponiblesPorTalla(talla, sedeId).stream()
+                .map(entityMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public StockItem guardar(StockItem stockItem) {
         StockItemJpaEntity entity = repository.findById(stockItem.getId())

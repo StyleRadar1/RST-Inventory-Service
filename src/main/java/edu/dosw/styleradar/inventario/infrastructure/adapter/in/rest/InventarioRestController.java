@@ -13,6 +13,7 @@ import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.FiltrarPrendasPorTallaUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.RegistrarLoteStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.RegistrarStockUseCase;
@@ -35,12 +36,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Inventario", description = "Endpoints para registro, ajuste, reservas y consulta de existencias multisede")
+@Tag(name = "Inventario", description = "Endpoints para registro, ajuste, reservas, consulta y filtros de existencias multisede")
 @RestController
 @RequestMapping("/api/v1/inventario")
 public class InventarioRestController {
@@ -50,17 +52,20 @@ public class InventarioRestController {
     private final AjustarStockUseCase ajustarStockUseCase;
     private final GestionarReservaUseCase gestionarReservaUseCase;
     private final ConsultarStockUseCase consultarStockUseCase;
+    private final FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase;
 
     public InventarioRestController(RegistrarStockUseCase registrarStockUseCase,
                                     RegistrarLoteStockUseCase registrarLoteStockUseCase,
                                     AjustarStockUseCase ajustarStockUseCase,
                                     GestionarReservaUseCase gestionarReservaUseCase,
-                                    ConsultarStockUseCase consultarStockUseCase) {
+                                    ConsultarStockUseCase consultarStockUseCase,
+                                    FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase) {
         this.registrarStockUseCase = registrarStockUseCase;
         this.registrarLoteStockUseCase = registrarLoteStockUseCase;
         this.ajustarStockUseCase = ajustarStockUseCase;
         this.gestionarReservaUseCase = gestionarReservaUseCase;
         this.consultarStockUseCase = consultarStockUseCase;
+        this.filtrarPrendasPorTallaUseCase = filtrarPrendasPorTallaUseCase;
     }
 
     @Operation(summary = "Consultar disponibilidad de una prenda",
@@ -109,6 +114,22 @@ public class InventarioRestController {
             @PathVariable UUID sedeId) {
         List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId);
         return ResponseEntity.ok(disponibles);
+    }
+
+    @Operation(summary = "Filtrar prendas disponibles por talla (SR-RF-10 / RES-24)",
+            description = "Retorna la lista de identificadores UUID de prendas que cuentan con existencias físicas disponibles en la talla indicada. Utilizado por ms-item-catalogo para resolver filtros.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de prendas disponibles en la talla seleccionada",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
+    })
+    @GetMapping("/tallas/{talla}/prendas")
+    public ResponseEntity<List<UUID>> filtrarPrendasPorTalla(
+            @Parameter(description = "Talla tipificada a consultar (ej. 'M', 'L', '40')", required = true)
+            @PathVariable String talla,
+            @Parameter(description = "Identificador opcional de sede física para acotar el filtro geográfico")
+            @RequestParam(required = false) UUID sedeId) {
+        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(talla, sedeId);
+        return ResponseEntity.ok(prendas);
     }
 
     @Operation(summary = "Registrar stock inicial de una talla",
