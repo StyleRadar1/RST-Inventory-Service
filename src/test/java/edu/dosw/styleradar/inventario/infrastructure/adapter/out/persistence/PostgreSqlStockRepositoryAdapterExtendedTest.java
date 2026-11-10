@@ -6,12 +6,15 @@ import edu.dosw.styleradar.inventario.domain.valueobject.Cantidad;
 import edu.dosw.styleradar.inventario.domain.valueobject.TallaRopa;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.entity.InventarioVarianteJpaEntity;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.entity.StockItemJpaEntity;
+import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.mapper.StockItemEntityMapper;
+import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.mapper.StockItemEntityMapperImpl;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.repository.SpringDataStockItemRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -27,6 +30,9 @@ class PostgreSqlStockRepositoryAdapterExtendedTest {
 
     @Mock
     private SpringDataStockItemRepository repository;
+
+    @Spy
+    private StockItemEntityMapper entityMapper = new StockItemEntityMapperImpl();
 
     @InjectMocks
     private PostgreSqlStockRepositoryAdapter adapter;

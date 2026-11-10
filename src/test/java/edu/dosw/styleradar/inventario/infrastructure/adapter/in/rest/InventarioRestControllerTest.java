@@ -15,11 +15,11 @@ import edu.dosw.styleradar.inventario.application.dto.SedeStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
-import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.RegistrarLoteStockUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.RegistrarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.RegistrarLoteStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.RegistrarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.exception.InventarioSuspendidoException;
 import edu.dosw.styleradar.inventario.domain.exception.ResourceNotFoundException;
 import edu.dosw.styleradar.inventario.domain.exception.StockInsuficienteException;
@@ -75,15 +75,6 @@ class InventarioRestControllerTest {
 
     @MockBean
     private ConsultarStockUseCase consultarStockUseCase;
-
-    @Test
-    @DisplayName("GET /api/v1/inventario/health retorna 200 con estado UP")
-    void healthCheckExitoso() throws Exception {
-        mockMvc.perform(get("/api/v1/inventario/health"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.service").value("ms-inventario"));
-    }
 
     @Test
     @DisplayName("GET /api/v1/inventario/prenda/{prendaId} retorna 200 con desglose")

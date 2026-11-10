@@ -2,7 +2,7 @@ package edu.dosw.styleradar.inventario.infrastructure.adapter.in.amqp;
 
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.LiberarReservaCommand;
-import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

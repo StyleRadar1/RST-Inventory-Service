@@ -11,15 +11,14 @@ import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
-import edu.dosw.styleradar.inventario.application.port.in.AjustarStockUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.ConsultarStockUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.GestionarReservaUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.RegistrarLoteStockUseCase;
-import edu.dosw.styleradar.inventario.application.port.in.RegistrarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.RegistrarLoteStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.RegistrarStockUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -39,12 +38,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
-/**
- * Adaptador primario REST para la gestión de inventario y reservas de StyleRadar.
- */
 @Tag(name = "Inventario", description = "Endpoints para registro, ajuste, reservas y consulta de existencias multisede")
 @RestController
 @RequestMapping("/api/v1/inventario")
@@ -66,18 +61,6 @@ public class InventarioRestController {
         this.ajustarStockUseCase = ajustarStockUseCase;
         this.gestionarReservaUseCase = gestionarReservaUseCase;
         this.consultarStockUseCase = consultarStockUseCase;
-    }
-
-    @Operation(summary = "Health check del microservicio de inventario",
-            description = "Retorna el estado operativo del servicio ms-inventario")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Servicio activo",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            examples = @ExampleObject(value = "{\"status\":\"UP\",\"service\":\"ms-inventario\"}")))
-    })
-    @GetMapping("/health")
-    public ResponseEntity<Map<String, Object>> health() {
-        return ResponseEntity.ok(Map.of("status", "UP", "service", "ms-inventario"));
     }
 
     @Operation(summary = "Consultar disponibilidad de una prenda",

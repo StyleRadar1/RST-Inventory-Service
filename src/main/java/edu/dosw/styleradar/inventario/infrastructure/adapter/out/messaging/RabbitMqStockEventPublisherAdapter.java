@@ -1,9 +1,9 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.out.messaging;
 
-import edu.dosw.styleradar.inventario.application.port.out.StockEventPublisherPort;
 import edu.dosw.styleradar.inventario.domain.event.DomainEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockAgotadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockBajoEvent;
+import edu.dosw.styleradar.inventario.domain.port.out.StockEventPublisherPort;
 import edu.dosw.styleradar.inventario.infrastructure.config.RabbitMqConfig;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
