@@ -226,6 +226,46 @@ El agregado principal es `StockItem`, que representa las existencias de una pren
 
 Se usa PostgreSQL porque las existencias requieren consistencia en cada reserva y venta. La tabla `inventario_items` guarda una fila por prenda y sede, con su tipo, estado, umbral de últimas unidades y si está activa; `inventario_tallas` guarda las unidades disponibles y reservadas de cada talla, en relación uno a muchos con `inventario_items`. La prenda y la sede se guardan solo por su identificador, ya que pertenecen a otros servicios (*Database-per-Service*).
 
+### Diagramas de Secuencia
+
+Los diagramas muestran, para cada funcionalidad, el recorrido de la petición por las capas del servicio, tanto en el camino exitoso como en los errores. Los fragmentos `alt` separan cada caso. Los archivos editables de draw.io están junto a las imágenes en `docs/evidencias`.
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-SECUENCIA-12063A?style=for-the-badge" alt="Diagrama de secuencia registrar stock" /><br />
+          <strong><font color="#5600EF" size="3">REGISTRAR STOCK DE UNA TALLA</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/diagrama-secuencia-registrar-stock.png" width="100%" alt="Diagrama de secuencia registrar stock" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+Al registrar las unidades de una talla, Spring valida primero el `RegistrarStockCommand`; si falta un dato obligatorio, `GlobalExceptionHandler` responde 400 con el campo que falló. Con la solicitud válida, el caso de uso comprueba que la talla corresponda al tipo de prenda (si no, 400) y busca el inventario de la prenda en la sede, que se crea si aún no existe. Si la sede está suspendida por mora se responde 403. En el caso normal, el inventario se guarda en PostgreSQL, se publica el evento de agotado o de últimas unidades cuando aplica y se responde 201 con el estado de la talla (SR-RF-52).
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-SECUENCIA-12063A?style=for-the-badge" alt="Diagrama de secuencia reservar stock" /><br />
+          <strong><font color="#5600EF" size="3">RESERVAR STOCK DE UNA TALLA</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/diagrama-secuencia-reservar-stock.png" width="100%" alt="Diagrama de secuencia reservar stock" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+Durante una compra se reservan unidades de una talla. Si la solicitud tiene datos inválidos se responde 400, y si la prenda no tiene inventario en la sede, 404. El dominio solo permite la reserva cuando hay unidades suficientes; de lo contrario se responde 409. Si la reserva procede, las unidades pasan de disponibles a reservadas, se guarda el cambio, se publica el evento de stock cuando aplica y se responde 200 con las unidades reservadas y la fecha en que vence la reserva.
+
 ### Estructura Oficial de Paquetes en `src/main/java/`
 
 ```text
@@ -301,11 +341,16 @@ src/main/java/edu/dosw/styleradar/inventario/
 
 | Método | Endpoint | Descripción | Rol Requerido | Códigos HTTP |
 | :---: | :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/inventario/prenda/{prendaId}` | Consultar las existencias y tallas disponibles de una prenda | Autenticado | `200`, `404` |
-| `POST` | `/api/v1/inventario` | Registrar las existencias iniciales por sede y talla | `TIENDA`, `ADMIN` | `201`, `400`, `409` |
+| `GET` | `/api/v1/inventario/prenda/{prendaId}` | Consultar las existencias por sede y talla de una prenda | Autenticado | `200`, `404` |
+| `GET` | `/api/v1/inventario/prenda/{prendaId}/disponibilidad` | Indicar si la prenda tiene unidades para mostrarse en los resultados (SR-RF-57) | Interno | `200`, `404` |
+| `GET` | `/api/v1/inventario/sedes/{sedeId}/disponibles` | Listar las prendas con unidades disponibles en una sede (SR-RF-57) | Interno | `200` |
+| `GET` | `/api/v1/inventario/tallas/{talla}/prendas` | Listar las prendas con unidades disponibles en una talla, con `sedeId` opcional (SR-RF-10) | Interno | `200` |
+| `POST` | `/api/v1/inventario` | Registrar las unidades de una talla en una sede | `TIENDA`, `ADMIN` | `201`, `400`, `403` |
+| `POST` | `/api/v1/inventario/lote` | Registrar varias tallas de una prenda a la vez (SR-RF-52) | `TIENDA`, `ADMIN` | `201`, `400`, `403` |
 | `PUT` | `/api/v1/inventario/{id}/ajuste` | Ajustar las existencias de una talla | `TIENDA`, `ADMIN` | `200`, `400`, `404` |
-| `POST` | `/api/v1/inventario/reserva` | Reservar unidades durante una compra | Interno | `200`, `400`, `409` |
-| `POST` | `/api/v1/inventario/reserva/confirmar` | Confirmar la salida de las unidades reservadas | Interno | `200`, `400`, `404` |
+| `PATCH` | `/api/v1/inventario/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}` | Actualizar la disponibilidad de una talla (SR-RF-56) | `TIENDA`, `ADMIN` | `200`, `400`, `403`, `404` |
+| `POST` | `/api/v1/inventario/reserva` | Reservar unidades durante una compra | Interno | `200`, `400`, `404`, `409` |
+| `POST` | `/api/v1/inventario/reserva/confirmar` | Confirmar la salida de las unidades reservadas | Interno | `200`, `400`, `404`, `409` |
 | `POST` | `/api/v1/inventario/reserva/liberar` | Liberar las unidades reservadas por cancelación | Interno | `200`, `400`, `404` |
 | `GET` | `/api/v1/health` | Estado del servicio | Público | `200` |
 
@@ -321,8 +366,13 @@ La comunicación asíncrona entre microservicios se realiza a través de **Rabbi
 
 | Tipo | Evento | Emisor / Receptor | Propósito |
 | :---: | :--- | :--- | :--- |
-| **PUBLICA** | `StockChangedEvent` | `ms-inventario` &rarr; `ms-playlist`, `ms-notificaciones` | Cambio en las unidades disponibles de una talla. |
-| **PUBLICA** | `PrendaAgotadaEvent` | `ms-inventario` &rarr; `ms-item-catalogo`, `ms-playlist` | Todas las tallas de una prenda quedaron sin unidades. |
+| **PUBLICA** | `inventario.stock.agotado` (`StockAgotadoEvent`) | `ms-inventario` &rarr; `ms-item-catalogo` | Una talla de la prenda quedó sin unidades en una sede. |
+| **PUBLICA** | `inventario.stock.ultimas-unidades` (`StockBajoEvent`) | `ms-inventario` &rarr; `styleradar.events` | Una talla quedó por debajo del umbral de últimas unidades. |
+| **CONSUME** | `tienda.suscripcion.suspendida` | `ms-pagos-suscripciones` &rarr; `ms-inventario` | Suspende el inventario de la sede por mora. |
+| **CONSUME** | `orden.pago.aprobado` | `ms-pagos` &rarr; `ms-inventario` | Confirma la salida de las unidades reservadas. |
+| **CONSUME** | `orden.pago.rechazado` | `ms-pagos` &rarr; `ms-inventario` | Libera las unidades reservadas. |
+
+Todos los eventos viajan por el exchange `styleradar.events` en formato JSON. Los que publica el servicio llevan `eventId`, `eventType`, `timestamp` y `producer`, y en `data` los campos `prendaId`, `sedeId`, `talla`, `stockRestante` y `estado`.
 
 ---
 
@@ -571,6 +621,7 @@ Los tipos más usados son `feat`, `fix`, `test`, `docs`, `refactor` y `chore`.
 
 | Código RF | Nombre del Requerimiento | Historia en Jira |
 | :---: | :--- | :---: |
+| `SR-RF-10` | Filtrar prendas por talla (apoyo) | `RES-102` |
 | `SR-RF-52` | Registrar tallas disponibles de una prenda | `RES-6` |
 | `SR-RF-56` | Actualizar disponibilidad por talla | `RES-7` |
 | `SR-RF-57` | Ocultar prenda agotada de los resultados disponibles | `RES-8` |
