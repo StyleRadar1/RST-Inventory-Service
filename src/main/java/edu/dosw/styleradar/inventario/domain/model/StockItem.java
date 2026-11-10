@@ -23,9 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Agregado raíz del contexto de inventario. Identifica el stock de una prenda
- * en una sede concreta y encapsula todas las invariantes de stock, reservas,
- * suspensión y etiquetas automáticas.
+ * Agregado raíz del contexto de inventario.
  */
 public class StockItem {
 
@@ -182,6 +180,17 @@ public class StockItem {
 
     public boolean estaAgotada() {
         return getStockDisponibleTotal() == 0;
+    }
+
+    public boolean tieneStockDisponibleEnTalla(String talla) {
+        if (!activo || talla == null || talla.isBlank()) {
+            return false;
+        }
+        InventarioVariante variante = variantes.get(talla.trim());
+        if (variante == null) {
+            variante = variantes.get(talla.trim().toUpperCase());
+        }
+        return variante != null && variante.getStockDisponible().valor() > 0;
     }
 
     public EstadoItem calcularEstado(Instant ahora) {

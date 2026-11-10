@@ -17,6 +17,7 @@ import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.FiltrarPrendasPorTallaUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.RegistrarLoteStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.RegistrarStockUseCase;
@@ -76,6 +77,9 @@ class InventarioRestControllerTest {
     @MockBean
     private ConsultarStockUseCase consultarStockUseCase;
 
+    @MockBean
+    private FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase;
+
     @Test
     @DisplayName("GET /api/v1/inventario/prenda/{prendaId} retorna 200 con desglose")
     void consultarPrendaExitoso() throws Exception {
@@ -118,6 +122,18 @@ class InventarioRestControllerTest {
         when(consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId)).thenReturn(List.of(prendaId));
 
         mockMvc.perform(get("/api/v1/inventario/sedes/{sedeId}/disponibles", sedeId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/inventario/tallas/{talla}/prendas filtra prendas por talla (RES-24 / SR-RF-10)")
+    void filtrarPrendasPorTallaExitoso() throws Exception {
+        UUID prendaId = UUID.randomUUID();
+        when(filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(eq("M"), any()))
+                .thenReturn(List.of(prendaId));
+
+        mockMvc.perform(get("/api/v1/inventario/tallas/{talla}/prendas", "M"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value(prendaId.toString()));
     }

@@ -29,9 +29,11 @@ public interface SpringDataStockItemRepository extends JpaRepository<StockItemJp
     @EntityGraph(attributePaths = "variantes")
     List<StockItemJpaEntity> findBySedeId(UUID sedeId);
 
-    /**
-     * Bloqueo pesimista para evitar sobreventa en reservas concurrentes.
-     */
+    @Query("SELECT DISTINCT s FROM StockItemJpaEntity s JOIN s.variantes v " +
+           "WHERE UPPER(v.talla) = UPPER(:talla) AND v.unidadesDisponibles > 0 AND s.activo = true " +
+           "AND (:sedeId IS NULL OR s.sedeId = :sedeId)")
+    List<StockItemJpaEntity> buscarPrendasDisponiblesPorTalla(@Param("talla") String talla, @Param("sedeId") UUID sedeId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "variantes")
     @Query("SELECT s FROM StockItemJpaEntity s WHERE s.prendaId = :prendaId AND s.sedeId = :sedeId")
