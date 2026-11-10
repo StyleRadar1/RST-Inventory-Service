@@ -5,7 +5,8 @@ on:
     branches:
       - develop  # Despliega automáticamente a QA
       - master   # Despliega automáticamente a PROD
-      - main     # Despliega automáticamente a PROD
+      - main
+      - 'feature/**' # Despliega automáticamente a PROD
   workflow_dispatch:
     inputs:
       target_env:
