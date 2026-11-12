@@ -1,6 +1,7 @@
 package edu.dosw.styleradar.inventario.domain.model;
 
 import edu.dosw.styleradar.inventario.domain.event.DomainEvent;
+import edu.dosw.styleradar.inventario.domain.event.StockActualizadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockAgotadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockBajoEvent;
 import edu.dosw.styleradar.inventario.domain.exception.CantidadInvalidaException;
@@ -242,7 +243,7 @@ public class StockItem {
 
     public Optional<InventarioVariante> buscarVariante(Talla talla) {
         if (talla == null) {
-            throw new IllegalArgumentException("La talla no puede ser nula");
+            throw new TallaInvalidaException("La talla no puede ser nula");
         }
         return Optional.ofNullable(variantes.get(talla.getValor()));
     }
@@ -304,6 +305,13 @@ public class StockItem {
 
     private void evaluarEventosDeStock(InventarioVariante variante, Instant ahora) {
         int stockRestante = variante.getStockDisponible().valor();
+
+        // 1. Emisión en toda mutación física
+        domainEvents.add(new StockActualizadoEvent(UUID.randomUUID(), prendaId, sedeId,
+                variante.getTalla().getValor(), stockRestante,
+                variante.getStockReservado().valor(), ahora));
+
+        // 2. Emisión por umbral crítico
         if (stockRestante == 0) {
             domainEvents.add(new StockAgotadoEvent(UUID.randomUUID(), prendaId, sedeId,
                     variante.getTalla().getValor(), stockRestante, ahora));

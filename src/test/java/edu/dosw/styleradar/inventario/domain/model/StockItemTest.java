@@ -1,6 +1,7 @@
 package edu.dosw.styleradar.inventario.domain.model;
 
 import edu.dosw.styleradar.inventario.domain.event.DomainEvent;
+import edu.dosw.styleradar.inventario.domain.event.StockActualizadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockAgotadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockBajoEvent;
 import edu.dosw.styleradar.inventario.domain.exception.CantidadInvalidaException;
@@ -162,18 +163,20 @@ class StockItemTest {
     }
 
     @Test
-    @DisplayName("Disparo y extracción de eventos de dominio StockAgotado y StockBajo")
+    @DisplayName("Disparo y extracción de eventos de dominio StockActualizado, StockAgotado y StockBajo")
     void disparoDeEventosDeDominio() {
         stockItem.registrarTalla(TallaRopa.XS, Cantidad.de(2), FECHA_PUBLICACION);
         List<DomainEvent> eventosBajo = stockItem.pullDomainEvents();
-        assertThat(eventosBajo).hasSize(1);
-        assertThat(eventosBajo.getFirst()).isInstanceOf(StockBajoEvent.class);
+        assertThat(eventosBajo).hasSize(2);
+        assertThat(eventosBajo).anyMatch(e -> e instanceof StockBajoEvent);
+        assertThat(eventosBajo).anyMatch(e -> e instanceof StockActualizadoEvent);
         assertThat(stockItem.pullDomainEvents()).isEmpty();
 
         stockItem.actualizarStockFisico(TallaRopa.XS, Cantidad.cero(), FECHA_PUBLICACION.plusSeconds(10));
         List<DomainEvent> eventosAgotado = stockItem.pullDomainEvents();
-        assertThat(eventosAgotado).hasSize(1);
-        assertThat(eventosAgotado.getFirst()).isInstanceOf(StockAgotadoEvent.class);
+        assertThat(eventosAgotado).hasSize(2);
+        assertThat(eventosAgotado).anyMatch(e -> e instanceof StockAgotadoEvent);
+        assertThat(eventosAgotado).anyMatch(e -> e instanceof StockActualizadoEvent);
     }
 
     @Test
@@ -183,7 +186,7 @@ class StockItemTest {
                 .isInstanceOf(TallaNoRegistradaException.class);
 
         assertThatThrownBy(() -> stockItem.buscarVariante(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(TallaInvalidaException.class);
 
         assertThatThrownBy(() -> new StockItem(UUID.randomUUID(), prendaId, sedeId,
                 TipoPrenda.ROPA, FECHA_PUBLICACION, FECHA_PUBLICACION, -1, true))

@@ -15,7 +15,7 @@ public record StockBajoEvent(
         int stockRestante,
         Instant ocurridoEn) implements DomainEvent {
 
-    public static final String EVENT_TYPE = "inventario.stock.ultimas-unidades";
+    public static final String EVENT_TYPE = "styleradar.inventario.stock.ultimas-unidades";
 
     public StockBajoEvent {
         Objects.requireNonNull(eventId, "eventId es obligatorio");
