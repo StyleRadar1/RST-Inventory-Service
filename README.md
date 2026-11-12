@@ -186,6 +186,26 @@ flowchart TD
 
 El diagrama muestra los cuatro microservicios del paquete Catálogo y cómo se relacionan. El front entra por el API Gateway con HTTPS bajo `/api/v1`. `ms-item-catalogo` consulta por Feign a `ms-inventario` las prendas con unidades en una talla y a `ms-geolocalizacion` la distancia a cada almacén. Los eventos viajan por el exchange `styleradar.exchange` de RabbitMQ: ítem-catálogo publica `styleradar.catalogo.prenda.publicada`, `styleradar.catalogo.prenda.retirada` y `styleradar.catalogo.moderacion.cambiada` y consume `styleradar.inventario.actualizado` y `styleradar.inventario.stock.agotado`; inventario publica `styleradar.inventario.actualizado`, `styleradar.inventario.stock.agotado` y `styleradar.inventario.stock.ultimas-unidades`; y playlist consume `styleradar.catalogo.prenda.retirada`. Cada servicio tiene su propia base PostgreSQL. El archivo editable está en `docs/evidencias/diagrama-componentes-general-paquete.drawio`.
 
+### Diagrama de Despliegue
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-DESPLIEGUE-12063A?style=for-the-badge" alt="Diagrama de despliegue" /><br />
+          <strong><font color="#5600EF" size="3">DIAGRAMA DE DESPLIEGUE · PAQUETE 2 CATÁLOGO</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/diagrama-despliegue-paquete.png" width="100%" alt="Diagrama de despliegue del paquete" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+El diagrama muestra dónde se ejecuta cada parte del paquete. Con cada push a `develop` o `master`, GitHub Actions construye la imagen del servicio, la publica en GitHub Container Registry y la despliega en Azure Container Apps (entorno `styleradar-cae-prod`, región northcentralus): `develop` va al ambiente QA y `master` al ambiente PROD, cada uno con un contenedor por servicio. El front llega a los contenedores a través del API Gateway por HTTPS. Los servicios guardan sus datos en Azure Database for PostgreSQL 16 (`styleradar-postgres-prod`), con una base por servicio y por ambiente, y se comunican por eventos con el broker RabbitMQ del curso. El archivo editable está en `docs/evidencias/diagrama-despliegue-paquete.drawio`.
+
 ### Diagrama de Componentes Específico
 
 <div align="center">
