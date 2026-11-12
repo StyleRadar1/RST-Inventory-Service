@@ -1,11 +1,12 @@
 server:
   port: ${SERVER_PORT:8200}
+  forward-headers-strategy: framework
 
 spring:
   application:
     name: ms-inventario
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:inventario_db}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:inventario_db}?sslmode=${DB_SSL_MODE:prefer}
     username: ${DB_USER:styleradar_user}
     password: ${DB_PASSWORD:}
   jpa:
@@ -28,6 +29,7 @@ springdoc:
     path: /api/v1/swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+    try-it-out-enabled: true
 
 management:
   endpoints:
