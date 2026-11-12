@@ -197,14 +197,14 @@ El diagrama muestra los cuatro microservicios del paquete Catálogo y cómo se r
           <strong><font color="#5600EF" size="3">DIAGRAMA DE COMPONENTES ESPECÍFICO (HEXAGONAL)</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/ComponentesInventarioSR.drawio.png" width="100%" alt="Diagrama de componentes" /><br />
+          <img src="docs/evidencias/DiagramaComponentesInventario.png" width="100%" alt="Diagrama de componentes" /><br />
         </p>
       </td>
     </tr>
   </table>
 </div>
 
-El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan desde el API Gateway a `InventarioRestController` y los eventos de otros servicios llegan por RabbitMQ a `OrdenPagoEventListener` y `SuscripcionEventListener` (adaptadores de entrada). Estos solo conocen los casos de uso (puertos de entrada): registrar, ajustar y consultar existencias, gestionar reservas y suspender el inventario, que implementa `InventarioApplicationService`. El servicio usa los puertos de salida para guardar las existencias en PostgreSQL (`StockRepositoryPort`), publicar los eventos de stock en RabbitMQ (`StockEventPublishPort`) y consultar la caché en Redis (`StockCachePort`). Las dependencias apuntan hacia adentro, por lo que el dominio no conoce Spring, JPA ni HTTP.
+El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan desde el API Gateway a `InventarioRestController` y los eventos de otros servicios llegan por RabbitMQ a `OrdenPagoEventListener` y `SuscripcionEventListener` (adaptadores de entrada). Estos solo conocen los casos de uso (puertos de entrada): registrar stock, registrar un lote de tallas, ajustar y consultar existencias, filtrar prendas por talla, gestionar reservas y suspender el inventario, cada uno con su implementación. El servicio usa los puertos de salida para guardar las existencias en PostgreSQL 16 (`StockRepositoryPort`) y publicar los eventos de stock en el exchange `styleradar.exchange` de RabbitMQ (`StockEventPublisherPort`); los mensajes que fallan pasan por `styleradar.dlx` a la cola `styleradar.inventario.dlq`. El archivo editable está en `docs/evidencias/DiagramaComponentesInventario.drawio`. Las dependencias apuntan hacia adentro, por lo que el dominio no conoce Spring, JPA ni HTTP.
 
 ### Diagrama de Clases
 
@@ -217,14 +217,14 @@ El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan
           <strong><font color="#5600EF" size="3">DIAGRAMA DE CLASES DEL DOMINIO</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/DiagramaClasesInventarioSR.drawio.png" width="100%" alt="Diagrama de clases" /><br />
+          <img src="docs/evidencias/DiagramaClasesInventario.png" width="100%" alt="Diagrama de clases" /><br />
         </p>
       </td>
     </tr>
   </table>
 </div>
 
-El agregado principal es `StockItem`, que representa las existencias de una prenda en una sede y agrupa sus `InventarioVariante`, una por cada talla. Cada variante maneja las unidades disponibles y reservadas con el objeto de valor `Cantidad`, y su talla con `Talla`, que puede ser `TallaRopa` (XS a XXL) o `TallaCalzado` (34 a 45) según el `TipoPrenda`. Los métodos del agregado cubren registrar tallas, actualizar existencias, reservar, confirmar o liberar una reserva y suspender el inventario por mora. El estado de la prenda (disponible, últimas unidades, nueva, agotada o suspendida) se calcula a partir de las existencias, y al quedar pocas o ninguna unidad se generan los eventos de dominio `StockBajoEvent` y `StockAgotadoEvent`.
+El agregado principal es `StockItem`, que representa las existencias de una prenda en una sede y agrupa sus `InventarioVariante`, una por cada talla. Cada variante maneja las unidades disponibles y reservadas con el objeto de valor `Cantidad`, y su talla con `Talla`, que puede ser `TallaRopa` (XS a XXL) o `TallaCalzado` (34 a 45) según el `TipoPrenda`. Los métodos del agregado cubren registrar tallas, actualizar existencias, reservar, confirmar o liberar una reserva y suspender el inventario por mora. El estado de la prenda (disponible, últimas unidades, nueva, agotada o suspendida) se calcula a partir de las existencias, y al quedar pocas o ninguna unidad se generan los eventos de dominio `StockBajoEvent` y `StockAgotadoEvent`. Además, cada cambio de existencias genera `StockActualizadoEvent`. Los errores de negocio heredan de `DomainException`. El archivo editable está en `docs/evidencias/DiagramaClasesInventario.drawio`.
 
 ### Diagrama de Base de Datos
 
@@ -237,14 +237,14 @@ El agregado principal es `StockItem`, que representa las existencias de una pren
           <strong><font color="#5600EF" size="3">MODELO DE DATOS (POSTGRESQL)</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/DiagramaEntidadRelacionInventarioSR.drawio.png" width="100%" alt="Diagrama de base de datos" /><br />
+          <img src="docs/evidencias/DiagramaEntidadRelacionInventario.png" width="100%" alt="Diagrama de base de datos" /><br />
         </p>
       </td>
     </tr>
   </table>
 </div>
 
-Se usa PostgreSQL porque las existencias requieren consistencia en cada reserva y venta. La tabla `inventario_items` guarda una fila por prenda y sede, con su tipo, estado, umbral de últimas unidades y si está activa; `inventario_tallas` guarda las unidades disponibles y reservadas de cada talla, en relación uno a muchos con `inventario_items`. La prenda y la sede se guardan solo por su identificador, ya que pertenecen a otros servicios (*Database-per-Service*).
+Se usa PostgreSQL porque las existencias requieren consistencia en cada reserva y venta. La tabla `inventario_items` guarda una fila por prenda y sede, con su tipo, estado, umbral de últimas unidades y si está activa; `inventario_tallas` guarda las unidades disponibles y reservadas de cada talla, en relación uno a muchos con `inventario_items`. La prenda y la sede se guardan solo por su identificador, ya que pertenecen a otros servicios (*Database-per-Service*). El archivo editable está en `docs/evidencias/DiagramaEntidadRelacionInventario.drawio`.
 
 ### Diagramas de Secuencia
 
