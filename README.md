@@ -197,7 +197,7 @@ El diagrama muestra los cuatro microservicios del paquete Catálogo y cómo se r
           <strong><font color="#5600EF" size="3">DIAGRAMA DE COMPONENTES ESPECÍFICO (HEXAGONAL)</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/DiagramaComponentesEspecificoInventario.png" width="100%" alt="Diagrama de componentes" /><br />
+          <img src="docs/evidencias/ComponentesInventarioSR.drawio.png" width="100%" alt="Diagrama de componentes" /><br />
         </p>
       </td>
     </tr>
@@ -217,7 +217,7 @@ El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan
           <strong><font color="#5600EF" size="3">DIAGRAMA DE CLASES DEL DOMINIO</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/DiagramadeClasesInventario.png" width="100%" alt="Diagrama de clases" /><br />
+          <img src="docs/evidencias/DiagramaClasesInventarioSR.drawio.png" width="100%" alt="Diagrama de clases" /><br />
         </p>
       </td>
     </tr>
@@ -237,7 +237,7 @@ El agregado principal es `StockItem`, que representa las existencias de una pren
           <strong><font color="#5600EF" size="3">MODELO DE DATOS (POSTGRESQL)</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/DiagramaEntidadRelacionInventario.png" width="100%" alt="Diagrama de base de datos" /><br />
+          <img src="docs/evidencias/DiagramaEntidadRelacionInventarioSR.drawio.png" width="100%" alt="Diagrama de base de datos" /><br />
         </p>
       </td>
     </tr>

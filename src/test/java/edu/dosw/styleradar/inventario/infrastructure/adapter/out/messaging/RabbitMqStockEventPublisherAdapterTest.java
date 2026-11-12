@@ -1,5 +1,6 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.out.messaging;
 
+import edu.dosw.styleradar.inventario.domain.event.StockActualizadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockAgotadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockBajoEvent;
 import edu.dosw.styleradar.inventario.infrastructure.config.RabbitMqConfig;
@@ -30,7 +31,26 @@ class RabbitMqStockEventPublisherAdapterTest {
     private RabbitMqStockEventPublisherAdapter publisher;
 
     @Test
-    @DisplayName("Publica evento StockAgotadoEvent con routing key inventario.stock.agotado")
+    @DisplayName("Publica evento StockActualizadoEvent con routing key styleradar.inventario.actualizado")
+    void publicaStockActualizado() {
+        StockActualizadoEvent evento = new StockActualizadoEvent(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "M", 10, 0, Instant.now());
+
+        publisher.publicar(evento);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMqConfig.EXCHANGE_EVENTS),
+                eq("styleradar.inventario.actualizado"),
+                captor.capture());
+
+        Map<String, Object> payload = captor.getValue();
+        assertThat(payload).containsEntry("producer", "ms-inventario");
+        assertThat(payload).containsEntry("eventType", "styleradar.inventario.actualizado");
+    }
+
+    @Test
+    @DisplayName("Publica evento StockAgotadoEvent con routing key styleradar.inventario.stock.agotado")
     void publicaStockAgotado() {
         StockAgotadoEvent evento = new StockAgotadoEvent(
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "M", 0, Instant.now());
@@ -40,16 +60,16 @@ class RabbitMqStockEventPublisherAdapterTest {
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(rabbitTemplate).convertAndSend(
                 eq(RabbitMqConfig.EXCHANGE_EVENTS),
-                eq("inventario.stock.agotado"),
+                eq("styleradar.inventario.stock.agotado"),
                 captor.capture());
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("producer", "ms-inventario");
-        assertThat(payload).containsEntry("eventType", "inventario.stock.agotado");
+        assertThat(payload).containsEntry("eventType", "styleradar.inventario.stock.agotado");
     }
 
     @Test
-    @DisplayName("Publica evento StockBajoEvent con routing key inventario.stock.ultimas-unidades")
+    @DisplayName("Publica evento StockBajoEvent con routing key styleradar.inventario.stock.ultimas-unidades")
     void publicaStockBajo() {
         StockBajoEvent evento = new StockBajoEvent(
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "38", 2, Instant.now());
@@ -59,10 +79,10 @@ class RabbitMqStockEventPublisherAdapterTest {
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(rabbitTemplate).convertAndSend(
                 eq(RabbitMqConfig.EXCHANGE_EVENTS),
-                eq("inventario.stock.ultimas-unidades"),
+                eq("styleradar.inventario.stock.ultimas-unidades"),
                 captor.capture());
 
         Map<String, Object> payload = captor.getValue();
-        assertThat(payload).containsEntry("eventType", "inventario.stock.ultimas-unidades");
+        assertThat(payload).containsEntry("eventType", "styleradar.inventario.stock.ultimas-unidades");
     }
 }
