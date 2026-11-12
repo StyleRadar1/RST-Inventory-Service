@@ -38,6 +38,7 @@ jobs:
           if [ "${{ github.ref_name }}" = "master" ] || [ "${{ inputs.ambiente }}" = "prod" ]; then AMBIENTE=prod; fi
           REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           APP=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          if [ "$AMBIENTE" = "prod" ]; then echo "DB_NAME=${DB_NAME}_prod" >> "$GITHUB_ENV"; fi
           echo "ambiente=$AMBIENTE" >> "$GITHUB_OUTPUT"
           echo "app=$APP-$AMBIENTE" >> "$GITHUB_OUTPUT"
           echo "imagen=${{ env.REGISTRY }}/$REPO:$AMBIENTE-${{ github.sha }}" >> "$GITHUB_OUTPUT"
