@@ -20,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class RabbitMqStockEventPublisherAdapterTest {
@@ -31,10 +32,11 @@ class RabbitMqStockEventPublisherAdapterTest {
     private RabbitMqStockEventPublisherAdapter publisher;
 
     @Test
-    @DisplayName("Publica evento StockActualizadoEvent con routing key styleradar.inventario.actualizado")
+    @DisplayName("Publica evento StockActualizadoEvent con eventoId único y routing key oficial")
     void publicaStockActualizado() {
+        UUID eventId = UUID.randomUUID();
         StockActualizadoEvent evento = new StockActualizadoEvent(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "M", 10, 0, Instant.now());
+                eventId, UUID.randomUUID(), UUID.randomUUID(), "M", 10, 0, Instant.now());
 
         publisher.publicar(evento);
 
@@ -46,6 +48,8 @@ class RabbitMqStockEventPublisherAdapterTest {
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("producer", "ms-inventario");
+        assertThat(payload).containsEntry("eventoId", eventId);
+        assertThat(payload).containsEntry("eventId", eventId);
         assertThat(payload).containsEntry("eventType", "styleradar.inventario.actualizado");
     }
 
@@ -63,9 +67,7 @@ class RabbitMqStockEventPublisherAdapterTest {
                 eq("styleradar.inventario.stock.agotado"),
                 captor.capture());
 
-        Map<String, Object> payload = captor.getValue();
-        assertThat(payload).containsEntry("producer", "ms-inventario");
-        assertThat(payload).containsEntry("eventType", "styleradar.inventario.stock.agotado");
+        assertThat(captor.getValue()).containsEntry("eventType", "styleradar.inventario.stock.agotado");
     }
 
     @Test
@@ -82,7 +84,13 @@ class RabbitMqStockEventPublisherAdapterTest {
                 eq("styleradar.inventario.stock.ultimas-unidades"),
                 captor.capture());
 
-        Map<String, Object> payload = captor.getValue();
-        assertThat(payload).containsEntry("eventType", "styleradar.inventario.stock.ultimas-unidades");
+        assertThat(captor.getValue()).containsEntry("eventType", "styleradar.inventario.stock.ultimas-unidades");
+    }
+
+    @Test
+    @DisplayName("Ignora evento nulo sin interactuar con RabbitTemplate")
+    void ignoraEventoNulo() {
+        publisher.publicar(null);
+        verifyNoInteractions(rabbitTemplate);
     }
 }

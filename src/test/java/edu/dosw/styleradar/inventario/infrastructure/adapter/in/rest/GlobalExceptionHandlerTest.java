@@ -9,11 +9,15 @@ import edu.dosw.styleradar.inventario.domain.exception.TallaConUnidadesException
 import edu.dosw.styleradar.inventario.domain.exception.TallaInvalidaException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaNoRegistradaException;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 
@@ -51,6 +55,17 @@ class GlobalExceptionHandlerTest {
 
         ProblemDetail d2 = handler.handleNotFound(new ResourceNotFoundException("Recurso"));
         assertThat(d2.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+    }
+
+    @Test
+    void mapeaRutasInexistentesA404() {
+        ProblemDetail d1 = handler.handleRouteNotFound(new NoResourceFoundException(HttpMethod.GET, "/api/v1"));
+        assertThat(d1.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(d1.getTitle()).isEqualTo("Ruta no encontrada");
+
+        ProblemDetail d2 = handler.handleRouteNotFound(new NoHandlerFoundException("GET", "/no-existe", HttpHeaders.EMPTY));
+        assertThat(d2.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(d2.getTitle()).isEqualTo("Ruta no encontrada");
     }
 
     @Test
