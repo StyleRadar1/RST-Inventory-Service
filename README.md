@@ -64,7 +64,7 @@
 * **Identificador de Servicio:** `ms-inventario`
 * **Paquete Arquitectónico:** `Paquete 2: Catálogo`
 * **Puerto de Escucha Oficial:** `8200`
-* **Base de Datos Asignada:** `PostgreSQL 15.8` (`styleradar_inventory`), aislada bajo el patrón *Database-per-Service*.
+* **Base de Datos Asignada:** `PostgreSQL 16` (`styleradar_inventory`), aislada bajo el patrón *Database-per-Service*.
 * **Bounded Context:** `Inventario por talla`
 
 ### Responsabilidades del Dominio
@@ -166,6 +166,46 @@ flowchart TD
     class INFRA_IN,INFRA_OUT,REST,AMQP_IN,JPA_REPO,RABBIT_PUB infra;
 ```
 
+### Diagrama de Componentes General del Paquete
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-COMPONENTES%20GENERAL-12063A?style=for-the-badge" alt="Diagrama de componentes general" /><br />
+          <strong><font color="#5600EF" size="3">DIAGRAMA DE COMPONENTES GENERAL · PAQUETE 2 CATÁLOGO</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/diagrama-componentes-general-paquete.png" width="100%" alt="Diagrama de componentes general del paquete" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+El diagrama muestra los cuatro microservicios del paquete Catálogo y cómo se relacionan. El front entra por el API Gateway con HTTPS bajo `/api/v1`. `ms-item-catalogo` consulta por Feign a `ms-inventario` las prendas con unidades en una talla y a `ms-geolocalizacion` la distancia a cada almacén. Los eventos viajan por el exchange `styleradar.exchange` de RabbitMQ: ítem-catálogo publica `styleradar.catalogo.prenda.publicada`, `styleradar.catalogo.prenda.retirada` y `styleradar.catalogo.moderacion.cambiada` y consume `styleradar.inventario.actualizado` y `styleradar.inventario.stock.agotado`; inventario publica `styleradar.inventario.actualizado`, `styleradar.inventario.stock.agotado` y `styleradar.inventario.stock.ultimas-unidades`; y playlist consume `styleradar.catalogo.prenda.retirada`. Cada servicio tiene su propia base PostgreSQL. El archivo editable está en `docs/evidencias/diagrama-componentes-general-paquete.drawio`.
+
+### Diagrama de Despliegue
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-DESPLIEGUE-12063A?style=for-the-badge" alt="Diagrama de despliegue" /><br />
+          <strong><font color="#5600EF" size="3">DIAGRAMA DE DESPLIEGUE · PAQUETE 2 CATÁLOGO</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/diagrama-despliegue-paquete.png" width="100%" alt="Diagrama de despliegue del paquete" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+El diagrama muestra dónde se ejecuta cada parte del paquete. Con cada push a `develop` o `master`, GitHub Actions construye la imagen del servicio, la publica en GitHub Container Registry y la despliega en Azure Container Apps (entorno `styleradar-cae-prod`, región northcentralus): `develop` va al ambiente QA y `master` al ambiente PROD, cada uno con un contenedor por servicio. El front llega a los contenedores a través del API Gateway por HTTPS. Los servicios guardan sus datos en Azure Database for PostgreSQL 16 (`styleradar-postgres-prod`), con una base por servicio y por ambiente, y se comunican por eventos con el broker RabbitMQ del curso. El archivo editable está en `docs/evidencias/diagrama-despliegue-paquete.drawio`.
+
 ### Diagrama de Componentes Específico
 
 <div align="center">
@@ -177,14 +217,14 @@ flowchart TD
           <strong><font color="#5600EF" size="3">DIAGRAMA DE COMPONENTES ESPECÍFICO (HEXAGONAL)</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/DiagramaComponentesEspecificoInventario.png" width="100%" alt="Diagrama de componentes" /><br />
+          <img src="docs/evidencias/DiagramaComponentesInventario.png" width="100%" alt="Diagrama de componentes" /><br />
         </p>
       </td>
     </tr>
   </table>
 </div>
 
-El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan desde el API Gateway a `InventarioRestController` y los eventos de otros servicios llegan por RabbitMQ a `OrdenPagoEventListener` y `SuscripcionEventListener` (adaptadores de entrada). Estos solo conocen los casos de uso (puertos de entrada): registrar, ajustar y consultar existencias, gestionar reservas y suspender el inventario, que implementa `InventarioApplicationService`. El servicio usa los puertos de salida para guardar las existencias en PostgreSQL (`StockRepositoryPort`), publicar los eventos de stock en RabbitMQ (`StockEventPublishPort`) y consultar la caché en Redis (`StockCachePort`). Las dependencias apuntan hacia adentro, por lo que el dominio no conoce Spring, JPA ni HTTP.
+El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan desde el API Gateway a `InventarioRestController` y los eventos de otros servicios llegan por RabbitMQ a `OrdenPagoEventListener` y `SuscripcionEventListener` (adaptadores de entrada). Estos solo conocen los casos de uso (puertos de entrada): registrar stock, registrar un lote de tallas, ajustar y consultar existencias, filtrar prendas por talla, gestionar reservas y suspender el inventario, cada uno con su implementación. El servicio usa los puertos de salida para guardar las existencias en PostgreSQL 16 (`StockRepositoryPort`) y publicar los eventos de stock en el exchange `styleradar.exchange` de RabbitMQ (`StockEventPublisherPort`); los mensajes que fallan pasan por `styleradar.dlx` a la cola `styleradar.inventario.dlq`. El archivo editable está en `docs/evidencias/DiagramaComponentesInventario.drawio`. Las dependencias apuntan hacia adentro, por lo que el dominio no conoce Spring, JPA ni HTTP.
 
 ### Diagrama de Clases
 
@@ -197,14 +237,14 @@ El diagrama muestra el servicio en arquitectura hexagonal. Las peticiones llegan
           <strong><font color="#5600EF" size="3">DIAGRAMA DE CLASES DEL DOMINIO</font></strong>
         </p>
         <p>
-          <img src="docs/evidencias/DiagramadeClasesInventario.png" width="100%" alt="Diagrama de clases" /><br />
+          <img src="docs/evidencias/DiagramaClasesInventario.png" width="100%" alt="Diagrama de clases" /><br />
         </p>
       </td>
     </tr>
   </table>
 </div>
 
-El agregado principal es `StockItem`, que representa las existencias de una prenda en una sede y agrupa sus `InventarioVariante`, una por cada talla. Cada variante maneja las unidades disponibles y reservadas con el objeto de valor `Cantidad`, y su talla con `Talla`, que puede ser `TallaRopa` (XS a XXL) o `TallaCalzado` (34 a 45) según el `TipoPrenda`. Los métodos del agregado cubren registrar tallas, actualizar existencias, reservar, confirmar o liberar una reserva y suspender el inventario por mora. El estado de la prenda (disponible, últimas unidades, nueva, agotada o suspendida) se calcula a partir de las existencias, y al quedar pocas o ninguna unidad se generan los eventos de dominio `StockBajoEvent` y `StockAgotadoEvent`.
+El agregado principal es `StockItem`, que representa las existencias de una prenda en una sede y agrupa sus `InventarioVariante`, una por cada talla. Cada variante maneja las unidades disponibles y reservadas con el objeto de valor `Cantidad`, y su talla con `Talla`, que puede ser `TallaRopa` (XS a XXL) o `TallaCalzado` (34 a 45) según el `TipoPrenda`. Los métodos del agregado cubren registrar tallas, actualizar existencias, reservar, confirmar o liberar una reserva y suspender el inventario por mora. El estado de la prenda (disponible, últimas unidades, nueva, agotada o suspendida) se calcula a partir de las existencias, y al quedar pocas o ninguna unidad se generan los eventos de dominio `StockBajoEvent` y `StockAgotadoEvent`. Además, cada cambio de existencias genera `StockActualizadoEvent`. Los errores de negocio heredan de `DomainException`. El archivo editable está en `docs/evidencias/DiagramaClasesInventario.drawio`.
 
 ### Diagrama de Base de Datos
 
@@ -224,7 +264,7 @@ El agregado principal es `StockItem`, que representa las existencias de una pren
   </table>
 </div>
 
-Se usa PostgreSQL porque las existencias requieren consistencia en cada reserva y venta. La tabla `inventario_items` guarda una fila por prenda y sede, con su tipo, estado, umbral de últimas unidades y si está activa; `inventario_tallas` guarda las unidades disponibles y reservadas de cada talla, en relación uno a muchos con `inventario_items`. La prenda y la sede se guardan solo por su identificador, ya que pertenecen a otros servicios (*Database-per-Service*).
+Se usa PostgreSQL porque las existencias requieren consistencia en cada reserva y venta. La tabla `inventario_items` guarda una fila por prenda y sede, con su tipo, estado, umbral de últimas unidades y si está activa; `inventario_tallas` guarda las unidades disponibles y reservadas de cada talla, en relación uno a muchos con `inventario_items`. La prenda y la sede se guardan solo por su identificador, ya que pertenecen a otros servicios (*Database-per-Service*). El archivo editable está en `docs/evidencias/DiagramaEntidadRelacionInventario.drawio`.
 
 ### Diagramas de Secuencia
 
@@ -266,6 +306,63 @@ Al registrar las unidades de una talla, Spring valida primero el `RegistrarStock
 
 Durante una compra se reservan unidades de una talla. Si la solicitud tiene datos inválidos se responde 400, y si la prenda no tiene inventario en la sede, 404. El dominio solo permite la reserva cuando hay unidades suficientes; de lo contrario se responde 409. Si la reserva procede, las unidades pasan de disponibles a reservadas, se guarda el cambio, se publica el evento de stock cuando aplica y se responde 200 con las unidades reservadas y la fecha en que vence la reserva.
 
+### Diagramas de Flujo
+
+Los diagramas de flujo muestran el recorrido del usuario por las pantallas de StyleRadar y los microservicios del paquete que intervienen en cada paso. Los archivos editables de Excalidraw están junto a las imágenes en `docs/evidencias`.
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-FLUJO-12063A?style=for-the-badge" alt="Diagrama de flujo de publicación y moderación de una prenda" /><br />
+          <strong><font color="#5600EF" size="3">PUBLICACIÓN Y MODERACIÓN DE UNA PRENDA</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/flujo-publicacion-moderacion.png" width="100%" alt="Diagrama de flujo de publicación y moderación de una prenda" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+El almacén publica la prenda desde Mi tienda con sus fotos, precio, atributos y tallas. La prenda queda pendiente en ms-item-catalogo y sus unidades por talla se registran en ms-inventario. El administrador revisa las publicaciones pendientes agrupadas por almacén y las aprueba o rechaza; con la aprobación, la prenda aparece en el catálogo. Si una talla se agota, ms-inventario publica `inventario.stock.agotado` y la prenda deja de mostrarse.
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-FLUJO-12063A?style=for-the-badge" alt="Diagrama de flujo de búsqueda de prendas y playlists" /><br />
+          <strong><font color="#5600EF" size="3">BÚSQUEDA DE PRENDAS Y PLAYLISTS</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/flujo-busqueda-playlists.png" width="100%" alt="Diagrama de flujo de búsqueda de prendas y playlists" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+El usuario busca y filtra prendas por tipo, color, talla o precio, y puede ordenar los resultados por distancia. ms-item-catalogo consulta a ms-inventario las prendas con unidades en la talla pedida y a ms-geolocalizacion la distancia a cada almacén. El usuario guarda una prenda en su playlist y, si la tienda la retira, ms-item-catalogo publica `styleradar.catalogo.prenda.retirada` y ms-playlist la marca como no disponible en las playlists.
+
+<div align="center">
+  <table width="100%" style="margin: 18px 0; border: 2px dashed #C4B5FD; border-radius: 8px; background-color: #FBFBFE;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <p>
+          <img src="https://img.shields.io/badge/DIAGRAMA-FLUJO-12063A?style=for-the-badge" alt="Diagrama de flujo del mapa al catálogo de un almacén" /><br />
+          <strong><font color="#5600EF" size="3">DEL MAPA AL CATÁLOGO DE UN ALMACÉN</font></strong>
+        </p>
+        <p>
+          <img src="docs/evidencias/flujo-mapa-catalogo.png" width="100%" alt="Diagrama de flujo del mapa al catálogo de un almacén" /><br />
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+En el mapa, el usuario ve los almacenes aliados y las fundaciones cercanas con su distancia, calculada por ms-geolocalizacion, y puede filtrar por categoría. Al tocar un almacén se muestra el resumen de su catálogo y, desde Tiendas, el catálogo completo con sus novedades de la semana, que entrega ms-item-catalogo. Las tallas disponibles de cada prenda vienen de ms-inventario.
 ### Estructura Oficial de Paquetes en `src/main/java/`
 
 ```text
@@ -366,13 +463,14 @@ La comunicación asíncrona entre microservicios se realiza a través de **Rabbi
 
 | Tipo | Evento | Emisor / Receptor | Propósito |
 | :---: | :--- | :--- | :--- |
-| **PUBLICA** | `inventario.stock.agotado` (`StockAgotadoEvent`) | `ms-inventario` &rarr; `ms-item-catalogo` | Una talla de la prenda quedó sin unidades en una sede. |
-| **PUBLICA** | `inventario.stock.ultimas-unidades` (`StockBajoEvent`) | `ms-inventario` &rarr; `styleradar.events` | Una talla quedó por debajo del umbral de últimas unidades. |
+| **PUBLICA** | `styleradar.inventario.actualizado` (`StockActualizadoEvent`) | `ms-inventario` &rarr; `ms-item-catalogo` | Cambiaron las existencias de una talla. |
+| **PUBLICA** | `styleradar.inventario.stock.agotado` (`StockAgotadoEvent`) | `ms-inventario` &rarr; `ms-item-catalogo` | Una talla de la prenda quedó sin unidades en una sede. |
+| **PUBLICA** | `styleradar.inventario.stock.ultimas-unidades` (`StockBajoEvent`) | `ms-inventario` &rarr; `styleradar.exchange` | Una talla quedó por debajo del umbral de últimas unidades. |
 | **CONSUME** | `tienda.suscripcion.suspendida` | `ms-pagos-suscripciones` &rarr; `ms-inventario` | Suspende el inventario de la sede por mora. |
 | **CONSUME** | `orden.pago.aprobado` | `ms-pagos` &rarr; `ms-inventario` | Confirma la salida de las unidades reservadas. |
 | **CONSUME** | `orden.pago.rechazado` | `ms-pagos` &rarr; `ms-inventario` | Libera las unidades reservadas. |
 
-Todos los eventos viajan por el exchange `styleradar.events` en formato JSON. Los que publica el servicio llevan `eventId`, `eventType`, `timestamp` y `producer`, y en `data` los campos `prendaId`, `sedeId`, `talla`, `stockRestante` y `estado`.
+Todos los eventos viajan por el exchange `styleradar.exchange` en formato JSON. Los que publica el servicio llevan `eventId`, `eventType`, `timestamp` y `producer`, y en `data` los campos `prendaId`, `sedeId`, `talla`, las unidades y el `estado`. Los eventos que consume llegan a las colas `styleradar.inventario.pago-aprobado.q`, `styleradar.inventario.pago-rechazado.q` y `styleradar.inventario.suscripcion-suspendida.q`, que también aceptan las llaves con el prefijo `styleradar`. Los mensajes que fallan pasan por `styleradar.dlx` a la cola `styleradar.inventario.dlq`.
 
 ---
 
@@ -384,7 +482,7 @@ Todos los eventos viajan por el exchange `styleradar.events` en formato JSON. Lo
 | :--- | :--- | :--- |
 | **Lenguaje Core** | Java | `21` |
 | **Framework** | Spring Boot | `3.3.4` |
-| **Base de Datos** | PostgreSQL | `15.8` |
+| **Base de Datos** | PostgreSQL | `16` |
 | **Migraciones de BD** | Flyway | Gestionada por Spring Boot |
 | **Broker de Mensajería** | RabbitMQ | `3.13.7` |
 | **Mapeo de DTOs** | MapStruct | `1.5.5.Final` |

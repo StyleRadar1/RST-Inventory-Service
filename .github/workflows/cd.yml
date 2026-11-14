@@ -1,0 +1,113 @@
+name: CD
+
+on:
+  push:
+    branches: [develop, master]
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: Ambiente de despliegue
+        required: true
+        default: qa
+        type: choice
+        options: [qa, prod]
+
+env:
+  APP_PORT: 8200
+  DB_NAME: inventario_db
+  REGISTRY: ghcr.io
+  RESOURCE_GROUP: STYLE_RADAR_PROD_RG
+  CONTAINERAPP_ENV: styleradar-cae-prod
+  DB_SERVER: styleradar-postgres-prod
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    name: Desplegar en Azure Container Apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir ambiente e imagen
+        id: vars
+        run: |
+          AMBIENTE=qa
+          if [ "${{ github.ref_name }}" = "master" ] || [ "${{ inputs.ambiente }}" = "prod" ]; then AMBIENTE=prod; fi
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          APP=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          if [ "$AMBIENTE" = "prod" ]; then echo "DB_NAME=${DB_NAME}_prod" >> "$GITHUB_ENV"; fi
+          echo "ambiente=$AMBIENTE" >> "$GITHUB_OUTPUT"
+          echo "app=$APP-$AMBIENTE" >> "$GITHUB_OUTPUT"
+          echo "imagen=${{ env.REGISTRY }}/$REPO:$AMBIENTE-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y publicar la imagen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars.outputs.imagen }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENCIALES_PROD }}
+
+      - name: Crear la base de datos si no existe
+        run: |
+          az postgres flexible-server db create \
+            --resource-group "$RESOURCE_GROUP" \
+            --server-name "$DB_SERVER" \
+            --name "$DB_NAME" || true
+
+      - name: Desplegar el contenedor
+        run: |
+          DOMINIO=$(az containerapp env show --name "$CONTAINERAPP_ENV" --resource-group "$RESOURCE_GROUP" --query properties.defaultDomain -o tsv)
+          AMBIENTE=${{ steps.vars.outputs.ambiente }}
+          az containerapp up \
+            --name "${{ steps.vars.outputs.app }}" \
+            --resource-group "$RESOURCE_GROUP" \
+            --location northcentralus \
+            --environment "$CONTAINERAPP_ENV" \
+            --image "${{ steps.vars.outputs.imagen }}" \
+            --target-port "$APP_PORT" \
+            --ingress external \
+            --registry-server "$REGISTRY" \
+            --registry-username "${{ github.actor }}" \
+            --registry-password "${{ secrets.GITHUB_TOKEN }}" \
+            --env-vars \
+              SERVER_PORT="$APP_PORT" \
+              DB_HOST="$DB_SERVER.postgres.database.azure.com" \
+              DB_PORT=5432 \
+              DB_NAME="$DB_NAME" \
+              DB_USER=styleradar_admin \
+              DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              SPRING_PROFILES_ACTIVE="$AMBIENTE"
+
+      - name: Verificar el health
+        run: |
+          FQDN=$(az containerapp show --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 20); do
+            if curl -fsS "https://$FQDN/api/v1/health"; then
+              echo
+              echo "URL: https://$FQDN/api/v1"
+              exit 0
+            fi
+            sleep 15
+          done
+          exit 1
+
+      - name: Mostrar el log del contenedor
+        if: failure()
+        run: az containerapp logs show --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --tail 100 --format text

@@ -15,7 +15,7 @@ public record StockAgotadoEvent(
         int stockRestante,
         Instant ocurridoEn) implements DomainEvent {
 
-    public static final String EVENT_TYPE = "inventario.stock.agotado";
+    public static final String EVENT_TYPE = "styleradar.inventario.stock.agotado";
 
     public StockAgotadoEvent {
         Objects.requireNonNull(eventId, "eventId es obligatorio");

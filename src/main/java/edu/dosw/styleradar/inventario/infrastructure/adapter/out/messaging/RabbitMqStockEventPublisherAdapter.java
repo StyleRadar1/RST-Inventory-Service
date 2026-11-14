@@ -1,6 +1,7 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.out.messaging;
 
 import edu.dosw.styleradar.inventario.domain.event.DomainEvent;
+import edu.dosw.styleradar.inventario.domain.event.StockActualizadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockAgotadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockBajoEvent;
 import edu.dosw.styleradar.inventario.domain.port.out.StockEventPublisherPort;
@@ -12,7 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Publicador de eventos de dominio hacia RabbitMQ.
+ * Publicador de eventos de dominio hacia RabbitMQ (TopicExchange: styleradar.exchange).
  */
 @Component
 public class RabbitMqStockEventPublisherAdapter implements StockEventPublisherPort {
@@ -36,7 +37,14 @@ public class RabbitMqStockEventPublisherAdapter implements StockEventPublisherPo
         payload.put("producer", "ms-inventario");
 
         Map<String, Object> data = new LinkedHashMap<>();
-        if (evento instanceof StockAgotadoEvent e) {
+        if (evento instanceof StockActualizadoEvent e) {
+            data.put("prendaId", e.prendaId());
+            data.put("sedeId", e.sedeId());
+            data.put("talla", e.talla());
+            data.put("stockDisponible", e.stockDisponible());
+            data.put("stockReservado", e.stockReservado());
+            data.put("estado", "ACTUALIZADO");
+        } else if (evento instanceof StockAgotadoEvent e) {
             data.put("prendaId", e.prendaId());
             data.put("sedeId", e.sedeId());
             data.put("talla", e.talla());
