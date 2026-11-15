@@ -19,9 +19,7 @@ env:
   RESOURCE_GROUP: STYLE_RADAR_PROD_RG
   CONTAINERAPP_ENV: styleradar-cae-prod
   DB_SERVER: styleradar-postgres-prod
-  RABBITMQ_HOST: styleradar-rabbitmq-qa.northcentralus.cloudapp.azure.com
-  RABBITMQ_PORT: 5671
-  RABBITMQ_USER: ms_inventario
+  RABBITMQ_HOST_QA: styleradar-rabbitmq-qa.northcentralus.cloudapp.azure.com
 
 permissions:
   contents: read
@@ -78,6 +76,18 @@ jobs:
         run: |
           DOMINIO=$(az containerapp env show --name "$CONTAINERAPP_ENV" --resource-group "$RESOURCE_GROUP" --query properties.defaultDomain -o tsv)
           AMBIENTE=${{ steps.vars.outputs.ambiente }}
+          BROKER=()
+          if [ "$AMBIENTE" = "qa" ]; then
+            BROKER=(
+              RABBITMQ_HOST="$RABBITMQ_HOST_QA"
+              RABBITMQ_PORT=5671
+              RABBITMQ_VHOST=/
+              RABBITMQ_USER=ms_inventario
+              RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}"
+              RABBITMQ_SSL_ENABLED=true
+              RABBITMQ_SSL_VERIFY_HOSTNAME=false
+            )
+          fi
           az containerapp up \
             --name "${{ steps.vars.outputs.app }}" \
             --resource-group "$RESOURCE_GROUP" \
@@ -96,13 +106,8 @@ jobs:
               DB_NAME="$DB_NAME" \
               DB_USER=styleradar_admin \
               DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
-              RABBITMQ_HOST="$RABBITMQ_HOST" \
-              RABBITMQ_PORT="$RABBITMQ_PORT" \
-              RABBITMQ_USER="$RABBITMQ_USER" \
-              RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}" \
-              RABBITMQ_VHOST=/ \
-              RABBITMQ_SSL_ENABLED=true \
-              SPRING_PROFILES_ACTIVE="$AMBIENTE"
+              SPRING_PROFILES_ACTIVE="$AMBIENTE" \
+              "${BROKER[@]}"
 
       - name: Verificar el health
         run: |
