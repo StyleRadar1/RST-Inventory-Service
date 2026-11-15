@@ -14,6 +14,8 @@ spring:
     enabled: true
     locations: classpath:db/migration
   rabbitmq:
+    ssl:
+      enabled: false
     listener:
       simple:
         auto-startup: false

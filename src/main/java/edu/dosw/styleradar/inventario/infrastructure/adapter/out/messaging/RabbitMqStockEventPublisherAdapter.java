@@ -31,6 +31,7 @@ public class RabbitMqStockEventPublisherAdapter implements StockEventPublisherPo
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("eventoId", evento.getEventId());
         payload.put("eventId", evento.getEventId());
         payload.put("eventType", evento.getEventType());
         payload.put("timestamp", evento.getOcurridoEn());

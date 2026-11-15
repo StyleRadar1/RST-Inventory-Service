@@ -19,6 +19,9 @@ env:
   RESOURCE_GROUP: STYLE_RADAR_PROD_RG
   CONTAINERAPP_ENV: styleradar-cae-prod
   DB_SERVER: styleradar-postgres-prod
+  RABBITMQ_HOST: styleradar-rabbitmq-qa.northcentralus.cloudapp.azure.com
+  RABBITMQ_PORT: 5671
+  RABBITMQ_USER: ms_inventario
 
 permissions:
   contents: read
@@ -93,6 +96,12 @@ jobs:
               DB_NAME="$DB_NAME" \
               DB_USER=styleradar_admin \
               DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              RABBITMQ_HOST="$RABBITMQ_HOST" \
+              RABBITMQ_PORT="$RABBITMQ_PORT" \
+              RABBITMQ_USER="$RABBITMQ_USER" \
+              RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}" \
+              RABBITMQ_VHOST=/ \
+              RABBITMQ_SSL_ENABLED=true \
               SPRING_PROFILES_ACTIVE="$AMBIENTE"
 
       - name: Verificar el health

@@ -7,6 +7,9 @@ RUN mvn -B clean package -DskipTests
 
 FROM eclipse-temurin:21.0.5_11-jre-alpine
 RUN addgroup -S app && adduser -S app -G app
+COPY rabbitmq-ca.pem /tmp/rabbitmq-ca.pem
+RUN keytool -importcert -trustcacerts -cacerts -storepass changeit -noprompt -alias styleradar-rabbitmq-ca -file /tmp/rabbitmq-ca.pem \
+    && rm -f /tmp/rabbitmq-ca.pem
 WORKDIR /app
 COPY --from=build --chown=app:app /build/target/ms-inventario-0.0.1-SNAPSHOT.jar app.jar
 USER app

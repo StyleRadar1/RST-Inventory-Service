@@ -7,3 +7,6 @@ target/
 *.log
 .env
 docker-compose.override.yml
+ACCESOS_MICROSERVICIOS_RABBITMQ.txt
+rabbitmq-truststore.jks
+rabbitmq-truststore.txt
