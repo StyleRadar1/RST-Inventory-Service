@@ -12,6 +12,10 @@ on:
         type: choice
         options: [qa, prod]
 
+concurrency:
+  group: cd-${{ github.ref_name }}-${{ inputs.ambiente || 'auto' }}
+  cancel-in-progress: false
+
 env:
   APP_PORT: 8200
   DB_NAME: inventario_db
@@ -111,6 +115,22 @@ jobs:
 
       - name: Mantener una réplica activa
         run: az containerapp update --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --min-replicas 1
+
+      - name: Esperar al health antes de enviar tráfico
+        continue-on-error: true
+        run: |
+          ID=$(az containerapp show --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
+          URL="https://management.azure.com$ID?api-version=2024-03-01"
+          TEMPLATE=$(az rest --method get --url "$URL" --query properties.template -o json)
+          if [ "$(echo "$TEMPLATE" | jq '[.containers[0].probes[]?.type] | index("Readiness") != null')" = "true" ]; then
+            echo "Las sondas ya están configuradas"
+            exit 0
+          fi
+          NUEVO=$(echo "$TEMPLATE" | jq --argjson port "$APP_PORT" '.containers[0].probes = [
+            {"type": "Startup", "httpGet": {"path": "/api/v1/health", "port": $port}, "initialDelaySeconds": 10, "periodSeconds": 10, "failureThreshold": 30},
+            {"type": "Readiness", "httpGet": {"path": "/api/v1/health", "port": $port}, "periodSeconds": 10, "failureThreshold": 3}
+          ]')
+          az rest --method patch --url "$URL" --body "{\"properties\": {\"template\": $NUEVO}}"
 
       - name: Verificar el health
         run: |
