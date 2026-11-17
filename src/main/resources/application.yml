@@ -1,6 +1,10 @@
 server:
   port: ${SERVER_PORT:8200}
   forward-headers-strategy: framework
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
 
 spring:
   application:

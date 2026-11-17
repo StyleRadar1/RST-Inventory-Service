@@ -109,6 +109,9 @@ jobs:
               SPRING_PROFILES_ACTIVE="$AMBIENTE" \
               "${BROKER[@]}"
 
+      - name: Mantener una réplica activa
+        run: az containerapp update --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --min-replicas 1
+
       - name: Verificar el health
         run: |
           FQDN=$(az containerapp show --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
