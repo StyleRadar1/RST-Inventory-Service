@@ -412,11 +412,13 @@ src/main/java/edu/dosw/styleradar/inventario/
 
 | Entorno | Estado | Propósito | URL Base del Servicio | Swagger OpenAPI UI | Health Check |
 | :--- | :---: | :--- | :--- | :--- | :--- |
-| **Producción (PROD)** | Próximo Sprint | Despliegue productivo de StyleRadar | Próximo Sprint | Próximo Sprint | Próximo Sprint |
-| **Calidad / Pruebas (QA)** | Próximo Sprint | Pruebas integradas del Sprint | Próximo Sprint | Próximo Sprint | Próximo Sprint |
+| **Producción (PROD)** | Desplegado | Despliegue productivo de StyleRadar desde `master` | `https://rst-inventory-service-prod.redwave-74d6e30f.northcentralus.azurecontainerapps.io/api/v1` | [Swagger UI PROD](https://rst-inventory-service-prod.redwave-74d6e30f.northcentralus.azurecontainerapps.io/api/v1/swagger-ui.html) | [`/health`](https://rst-inventory-service-prod.redwave-74d6e30f.northcentralus.azurecontainerapps.io/api/v1/health) |
+| **Calidad / Pruebas (QA)** | Desplegado | Pruebas integradas del Sprint desde `develop` | `https://rst-inventory-service-qa.redwave-74d6e30f.northcentralus.azurecontainerapps.io/api/v1` | [Swagger UI QA](https://rst-inventory-service-qa.redwave-74d6e30f.northcentralus.azurecontainerapps.io/api/v1/swagger-ui.html) | [`/health`](https://rst-inventory-service-qa.redwave-74d6e30f.northcentralus.azurecontainerapps.io/api/v1/health) |
 | **Desarrollo Local (DEV)** | Local | Entorno de desarrollo local | `http://localhost:8200/api/v1` | [Swagger UI Local](http://localhost:8200/api/v1/swagger-ui.html) | [`/health`](http://localhost:8200/api/v1/health) |
 
 * **Especificación OpenAPI:** `http://localhost:8200/api/v1/v3/api-docs`
+
+* **Arranque en frío:** los ambientes de QA y PROD se apagan cuando no reciben tráfico. La primera petición puede responder `503` durante unos minutos mientras el contenedor vuelve a arrancar.
 
 <div align="center">
   <table width="100%" style="margin: 18px 0; border: 2px dashed #5600EF; border-radius: 8px; background-color: #FBFBFE;">
