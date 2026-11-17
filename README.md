@@ -668,3 +668,19 @@ Los tipos más usados son `feat`, `fix`, `test`, `docs`, `refactor` y `chore`.
 | `SR-RF-52` | Registrar tallas disponibles de una prenda | `RES-6` |
 | `SR-RF-56` | Actualizar disponibilidad por talla | `RES-7` |
 | `SR-RF-57` | Ocultar prenda agotada de los resultados disponibles | `RES-8` |
+
+## Eventos RabbitMQ (Exchange `styleradar.exchange` · TLS `:5671`)
+
+### Eventos Publicados por `ms-inventario`
+| Routing Key | Disparo | Campos clave en `data` |
+|---|---|---|
+| `styleradar.inventario.actualizado` | Toda modificación de stock | `prendaId`, `sedeId`, `talla`, `stockAnterior`, `stockDisponible`, `stockReservado`, `estado` |
+| `styleradar.inventario.stock.agotado` | Stock disponible llega a `0` | `prendaId`, `sedeId`, `talla`, `stockRestante`, `estado` |
+| `styleradar.inventario.stock.ultimas-unidades` | Stock disponible cae a `<= 3` | `prendaId`, `sedeId`, `talla`, `stockRestante`, `estado` |
+
+### Eventos Consumidos desde `ms-pagos` (NQS · sobre `data`)
+| Cola (`.q` con DLX `styleradar.dlx`) | Routing Key en `styleradar.exchange` | Acción en `ms-inventario` |
+|---|---|---|
+| `styleradar.inventario.pago-aprobado.q` | `styleradar.pagos.pago.confirmado` | Confirma reserva y deduce stock reservado |
+| `styleradar.inventario.suscripcion-suspendida.q` | `styleradar.pagos.suscripcion.suspendida` | Suspende operaciones de la sede por mora |
+| `styleradar.inventario.pago-rechazado.q` | *(Pendiente confirmar con NQS)* | Consumidor listo; sin enlace activo hasta confirmación de NQS |

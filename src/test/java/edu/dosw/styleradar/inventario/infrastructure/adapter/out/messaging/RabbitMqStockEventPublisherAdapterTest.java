@@ -32,11 +32,11 @@ class RabbitMqStockEventPublisherAdapterTest {
     private RabbitMqStockEventPublisherAdapter publisher;
 
     @Test
-    @DisplayName("Publica evento StockActualizadoEvent con eventoId único y routing key oficial")
+    @DisplayName("Publica StockActualizadoEvent con stockAnterior, stockDisponible, stockReservado y estado ACTUALIZADO")
     void publicaStockActualizado() {
         UUID eventId = UUID.randomUUID();
         StockActualizadoEvent evento = new StockActualizadoEvent(
-                eventId, UUID.randomUUID(), UUID.randomUUID(), "M", 10, 0, Instant.now());
+                eventId, UUID.randomUUID(), UUID.randomUUID(), "M", 0, 10, 0, Instant.now());
 
         publisher.publicar(evento);
 
@@ -51,6 +51,14 @@ class RabbitMqStockEventPublisherAdapterTest {
         assertThat(payload).containsEntry("eventoId", eventId);
         assertThat(payload).containsEntry("eventId", eventId);
         assertThat(payload).containsEntry("eventType", "styleradar.inventario.actualizado");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) payload.get("data");
+        assertThat(data)
+                .containsEntry("stockAnterior", 0)
+                .containsEntry("stockDisponible", 10)
+                .containsEntry("stockReservado", 0)
+                .containsEntry("estado", "ACTUALIZADO");
     }
 
     @Test

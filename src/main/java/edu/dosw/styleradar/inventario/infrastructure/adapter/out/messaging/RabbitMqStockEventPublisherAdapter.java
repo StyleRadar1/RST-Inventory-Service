@@ -42,6 +42,7 @@ public class RabbitMqStockEventPublisherAdapter implements StockEventPublisherPo
             data.put("prendaId", e.prendaId());
             data.put("sedeId", e.sedeId());
             data.put("talla", e.talla());
+            data.put("stockAnterior", e.stockAnterior());
             data.put("stockDisponible", e.stockDisponible());
             data.put("stockReservado", e.stockReservado());
             data.put("estado", "ACTUALIZADO");
