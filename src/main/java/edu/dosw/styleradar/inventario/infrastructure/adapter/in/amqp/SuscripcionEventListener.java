@@ -29,20 +29,20 @@ public class SuscripcionEventListener {
     @RabbitListener(queues = RabbitMqConfig.QUEUE_SUSCRIPCION)
     @Transactional
     public void onSuscripcionSuspendida(Map<String, Object> payload) {
-        log.info("Recibido evento de suscripción suspendida: {}", payload);
+        log.info("Recibido evento {}: {}", RabbitMqConfig.ROUTING_KEY_SUSCRIPCION_SUSPENDIDA, payload);
         String eventId = extraerEventId(payload);
         if (eventId != null && eventoProcesadoPort.yaFueProcesado(eventId)) {
             log.info("Evento de suscripción suspendida duplicado (eventId={}), omitiendo.", eventId);
             return;
         }
-        UUID sedeId = extraerUuid(payload, "sedeId");
+        UUID sedeId = extraerUuid(payload, "sedeId", "tiendaId");
         if (sedeId == null) {
-            log.warn("Payload de suspensión inválido o sin sedeId: {}", payload);
+            log.warn("Payload de suscripción suspendida inválido o sin sedeId/tiendaId: {}", payload);
             return;
         }
         suspenderInventarioUseCase.suspenderPorSede(sedeId);
         if (eventId != null) {
-            eventoProcesadoPort.registrarProcesado(eventId, RabbitMqConfig.ROUTING_KEY_SUSPENDIDA);
+            eventoProcesadoPort.registrarProcesado(eventId, RabbitMqConfig.ROUTING_KEY_SUSCRIPCION_SUSPENDIDA);
         }
     }
 
@@ -50,37 +50,53 @@ public class SuscripcionEventListener {
         if (payload == null) {
             return null;
         }
-        Object valor = payload.get("eventoId");
-        if (valor == null) {
-            valor = payload.get("eventId");
+        String directo = extraerStringDirecto(payload, "eventoId", "eventId");
+        if (directo != null) {
+            return directo;
         }
-        if (valor != null) {
-            String str = valor.toString().trim();
-            return str.isEmpty() ? null : str;
+        Object dataObj = payload.get("data");
+        if (dataObj instanceof Map<?, ?> dataMap) {
+            return extraerStringDirecto(dataMap, "eventoId", "eventId");
         }
         return null;
     }
 
-    static UUID extraerUuid(Map<String, Object> payload, String clave) {
+    static UUID extraerUuid(Map<?, ?> payload, String... claves) {
         if (payload == null) {
             return null;
         }
-        Object directo = payload.get(clave);
-        if (directo != null) {
-            try {
-                return UUID.fromString(directo.toString());
-            } catch (IllegalArgumentException e) {
-                return null;
-            }
-        }
+        // Prioridad al sobre 'data' estándar de ms-pagos, con fallback al nivel raíz
         Object dataObj = payload.get("data");
         if (dataObj instanceof Map<?, ?> dataMap) {
-            Object valor = dataMap.get(clave);
-            if (valor != null) {
+            UUID desdeData = extraerUuidDirecto(dataMap, claves);
+            if (desdeData != null) {
+                return desdeData;
+            }
+        }
+        return extraerUuidDirecto(payload, claves);
+    }
+
+    private static UUID extraerUuidDirecto(Map<?, ?> map, String... claves) {
+        for (String clave : claves) {
+            Object val = map.get(clave);
+            if (val != null) {
                 try {
-                    return UUID.fromString(valor.toString());
-                } catch (IllegalArgumentException e) {
-                    return null;
+                    return UUID.fromString(val.toString().trim());
+                } catch (IllegalArgumentException ignored) {
+                    // Continuar con siguiente clave candidata
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String extraerStringDirecto(Map<?, ?> map, String... claves) {
+        for (String clave : claves) {
+            Object val = map.get(clave);
+            if (val != null) {
+                String str = val.toString().trim();
+                if (!str.isEmpty()) {
+                    return str;
                 }
             }
         }

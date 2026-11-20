@@ -11,6 +11,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,26 +30,37 @@ public class OrdenPagoEventListener {
         this.eventoProcesadoPort = eventoProcesadoPort;
     }
 
+    /**
+     * Consume 'styleradar.pagos.pago.confirmado' publicado por ms-pagos (NQS) con sobre 'data'.
+     * Soporta tanto campos directos en 'data' como arreglo 'data.items'.
+     */
     @RabbitListener(queues = RabbitMqConfig.QUEUE_PAGO_APROBADO)
     @Transactional
     public void onPagoAprobado(Map<String, Object> payload) {
-        log.info("Recibido evento de pago aprobado: {}", payload);
+        log.info("Recibido evento {}: {}", RabbitMqConfig.ROUTING_KEY_PAGO_CONFIRMADO, payload);
         String eventId = SuscripcionEventListener.extraerEventId(payload);
         if (eventId != null && eventoProcesadoPort.yaFueProcesado(eventId)) {
-            log.info("Evento de pago aprobado duplicado (eventId={}), omitiendo.", eventId);
+            log.info("Evento de pago confirmado duplicado (eventId={}), omitiendo.", eventId);
             return;
         }
-        ConfirmarReservaCommand command = construirConfirmar(payload);
-        if (command == null) {
-            log.warn("Payload de pago aprobado incompleto: {}", payload);
+
+        List<ConfirmarReservaCommand> comandos = construirConfirmaciones(payload);
+        if (comandos.isEmpty()) {
+            log.warn("Payload de {} incompleto o sin items válidos: {}",
+                    RabbitMqConfig.ROUTING_KEY_PAGO_CONFIRMADO, payload);
             return;
         }
-        gestionarReservaUseCase.confirmar(command);
+
+        comandos.forEach(gestionarReservaUseCase::confirmar);
         if (eventId != null) {
-            eventoProcesadoPort.registrarProcesado(eventId, RabbitMqConfig.ROUTING_KEY_PAGO_APROBADO);
+            eventoProcesadoPort.registrarProcesado(eventId, RabbitMqConfig.ROUTING_KEY_PAGO_CONFIRMADO);
         }
     }
 
+    /**
+     * NOTA RES-139: Pendiente confirmar con NQS (ms-pagos) si existe evento de pago rechazado.
+     * Se mantiene el consumidor listo sobre la cola local para liberación ante rechazo.
+     */
     @RabbitListener(queues = RabbitMqConfig.QUEUE_PAGO_RECHAZADO)
     @Transactional
     public void onPagoRechazado(Map<String, Object> payload) {
@@ -64,17 +77,45 @@ public class OrdenPagoEventListener {
         }
         gestionarReservaUseCase.liberar(command);
         if (eventId != null) {
-            eventoProcesadoPort.registrarProcesado(eventId, RabbitMqConfig.ROUTING_KEY_PAGO_RECHAZADO);
+            eventoProcesadoPort.registrarProcesado(eventId, RabbitMqConfig.ROUTING_KEY_PAGO_RECHAZADO_PENDIENTE);
         }
     }
 
-    private ConfirmarReservaCommand construirConfirmar(Map<String, Object> payload) {
-        UUID prendaId = SuscripcionEventListener.extraerUuid(payload, "prendaId");
-        UUID sedeId = SuscripcionEventListener.extraerUuid(payload, "sedeId");
-        String talla = extraerTexto(payload, "talla");
-        Integer cantidad = extraerEntero(payload, "cantidad");
+    private List<ConfirmarReservaCommand> construirConfirmaciones(Map<String, Object> payload) {
+        if (payload == null) {
+            return List.of();
+        }
+        UUID sedeGlobal = SuscripcionEventListener.extraerUuid(payload, "sedeId", "tiendaId");
+        Map<?, ?> origenData = (payload.get("data") instanceof Map<?, ?> dataMap) ? dataMap : payload;
 
-        if (prendaId == null || sedeId == null || talla == null || cantidad == null) {
+        Object itemsObj = origenData.get("items");
+        if (itemsObj instanceof List<?> lista) {
+            List<ConfirmarReservaCommand> resultado = new ArrayList<>();
+            for (Object elemento : lista) {
+                if (elemento instanceof Map<?, ?> itemMap) {
+                    ConfirmarReservaCommand cmd = construirConfirmarDesdeMapa(itemMap, sedeGlobal);
+                    if (cmd != null) {
+                        resultado.add(cmd);
+                    }
+                }
+            }
+            return resultado;
+        }
+
+        ConfirmarReservaCommand unico = construirConfirmarDesdeMapa(payload, sedeGlobal);
+        return unico == null ? List.of() : List.of(unico);
+    }
+
+    private ConfirmarReservaCommand construirConfirmarDesdeMapa(Map<?, ?> mapa, UUID sedeFallback) {
+        UUID prendaId = SuscripcionEventListener.extraerUuid(mapa, "prendaId");
+        UUID sedeId = SuscripcionEventListener.extraerUuid(mapa, "sedeId", "tiendaId");
+        if (sedeId == null) {
+            sedeId = sedeFallback;
+        }
+        String talla = extraerTexto(mapa, "talla");
+        Integer cantidad = extraerEntero(mapa, "cantidad");
+
+        if (prendaId == null || sedeId == null || talla == null || cantidad == null || cantidad <= 0) {
             return null;
         }
         return new ConfirmarReservaCommand(prendaId, sedeId, talla, cantidad);
@@ -82,42 +123,42 @@ public class OrdenPagoEventListener {
 
     private LiberarReservaCommand construirLiberar(Map<String, Object> payload) {
         UUID prendaId = SuscripcionEventListener.extraerUuid(payload, "prendaId");
-        UUID sedeId = SuscripcionEventListener.extraerUuid(payload, "sedeId");
+        UUID sedeId = SuscripcionEventListener.extraerUuid(payload, "sedeId", "tiendaId");
         String talla = extraerTexto(payload, "talla");
         Integer cantidad = extraerEntero(payload, "cantidad");
 
-        if (prendaId == null || sedeId == null || talla == null || cantidad == null) {
+        if (prendaId == null || sedeId == null || talla == null || cantidad == null || cantidad <= 0) {
             return null;
         }
         return new LiberarReservaCommand(prendaId, sedeId, talla, cantidad);
     }
 
-    static String extraerTexto(Map<String, Object> payload, String clave) {
+    static String extraerTexto(Map<?, ?> payload, String clave) {
         if (payload == null) {
             return null;
-        }
-        Object directo = payload.get(clave);
-        if (directo != null) {
-            return directo.toString();
         }
         Object dataObj = payload.get("data");
         if (dataObj instanceof Map<?, ?> dataMap) {
             Object valor = dataMap.get(clave);
-            return valor == null ? null : valor.toString();
+            if (valor != null) {
+                return valor.toString();
+            }
         }
-        return null;
+        Object directo = payload.get(clave);
+        return directo == null ? null : directo.toString();
     }
 
-    static Integer extraerEntero(Map<String, Object> payload, String clave) {
+    static Integer extraerEntero(Map<?, ?> payload, String clave) {
         if (payload == null) {
             return null;
         }
-        Object valorObj = payload.get(clave);
+        Object valorObj = null;
+        Object dataObj = payload.get("data");
+        if (dataObj instanceof Map<?, ?> dataMap) {
+            valorObj = dataMap.get(clave);
+        }
         if (valorObj == null) {
-            Object dataObj = payload.get("data");
-            if (dataObj instanceof Map<?, ?> dataMap) {
-                valorObj = dataMap.get(clave);
-            }
+            valorObj = payload.get(clave);
         }
         if (valorObj instanceof Number n) {
             return n.intValue();

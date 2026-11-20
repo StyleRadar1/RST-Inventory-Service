@@ -41,18 +41,17 @@ public class RabbitMqConfig {
     public static final String QUEUE_PAGO_APROBADO = "styleradar.inventario.pago-aprobado.q";
     public static final String QUEUE_PAGO_RECHAZADO = "styleradar.inventario.pago-rechazado.q";
 
-    // Routing keys publicadas
+    // Routing keys publicadas por ms-inventario
     public static final String ROUTING_KEY_ACTUALIZADO = "styleradar.inventario.actualizado";
     public static final String ROUTING_KEY_AGOTADO = "styleradar.inventario.stock.agotado";
     public static final String ROUTING_KEY_ULTIMAS_UNIDADES = "styleradar.inventario.stock.ultimas-unidades";
 
-    // Routing keys consumidas
-    public static final String ROUTING_KEY_SUSPENDIDA = "tienda.suscripcion.suspendida";
-    public static final String ROUTING_KEY_SUSPENDIDA_ALT = "styleradar.tienda.suscripcion.suspendida";
-    public static final String ROUTING_KEY_PAGO_APROBADO = "orden.pago.aprobado";
-    public static final String ROUTING_KEY_PAGO_APROBADO_ALT = "styleradar.orden.pago.aprobado";
-    public static final String ROUTING_KEY_PAGO_RECHAZADO = "orden.pago.rechazado";
-    public static final String ROUTING_KEY_PAGO_RECHAZADO_ALT = "styleradar.orden.pago.rechazado";
+    // Routing keys reales publicadas por ms-pagos (NQS) - Hallazgo H19 (RES-139)
+    public static final String ROUTING_KEY_SUSCRIPCION_SUSPENDIDA = "styleradar.pagos.suscripcion.suspendida";
+    public static final String ROUTING_KEY_PAGO_CONFIRMADO = "styleradar.pagos.pago.confirmado";
+    // NOTA RES-139: Pendiente confirmar con NQS (ms-pagos) si publicará un evento de pago rechazado;
+    // se mantiene la cola declarada sin enlaces activos hacia claves no publicadas.
+    public static final String ROUTING_KEY_PAGO_RECHAZADO_PENDIENTE = "styleradar.pagos.pago.rechazado";
 
     @Bean
     public TopicExchange styleradarExchange() {
@@ -100,37 +99,18 @@ public class RabbitMqConfig {
 
     @Bean
     public Binding bindingSuscripcion(Queue suscripcionQueue, TopicExchange styleradarExchange) {
-        return BindingBuilder.bind(suscripcionQueue).to(styleradarExchange).with(ROUTING_KEY_SUSPENDIDA);
+        return BindingBuilder.bind(suscripcionQueue)
+                .to(styleradarExchange)
+                .with(ROUTING_KEY_SUSCRIPCION_SUSPENDIDA);
     }
 
     @Bean
-    public Binding bindingSuscripcionAlt(Queue suscripcionQueue, TopicExchange styleradarExchange) {
-        return BindingBuilder.bind(suscripcionQueue).to(styleradarExchange).with(ROUTING_KEY_SUSPENDIDA_ALT);
+    public Binding bindingPagoConfirmado(Queue pagoAprobadoQueue, TopicExchange styleradarExchange) {
+        return BindingBuilder.bind(pagoAprobadoQueue)
+                .to(styleradarExchange)
+                .with(ROUTING_KEY_PAGO_CONFIRMADO);
     }
 
-    @Bean
-    public Binding bindingPagoAprobado(Queue pagoAprobadoQueue, TopicExchange styleradarExchange) {
-        return BindingBuilder.bind(pagoAprobadoQueue).to(styleradarExchange).with(ROUTING_KEY_PAGO_APROBADO);
-    }
-
-    @Bean
-    public Binding bindingPagoAprobadoAlt(Queue pagoAprobadoQueue, TopicExchange styleradarExchange) {
-        return BindingBuilder.bind(pagoAprobadoQueue).to(styleradarExchange).with(ROUTING_KEY_PAGO_APROBADO_ALT);
-    }
-
-    @Bean
-    public Binding bindingPagoRechazado(Queue pagoRechazadoQueue, TopicExchange styleradarExchange) {
-        return BindingBuilder.bind(pagoRechazadoQueue).to(styleradarExchange).with(ROUTING_KEY_PAGO_RECHAZADO);
-    }
-
-    @Bean
-    public Binding bindingPagoRechazadoAlt(Queue pagoRechazadoQueue, TopicExchange styleradarExchange) {
-        return BindingBuilder.bind(pagoRechazadoQueue).to(styleradarExchange).with(ROUTING_KEY_PAGO_RECHAZADO_ALT);
-    }
-
-    /**
-     * Conversor JSON puro: fechas en ISO-8601 y cero dependencia de la cabecera __TypeId__ de Spring.
-     */
     @Bean
     public MessageConverter jsonMessageConverter(ObjectMapper objectMapper) {
         ObjectMapper rabbitMapper = objectMapper.copy();
@@ -164,10 +144,6 @@ public class RabbitMqConfig {
         return converter;
     }
 
-    /**
-     * Un JSON inválido (MessageConversionException) NO se reintenta y pasa directo a DLQ;
-     * fallos transitorios se reintentan hasta 3 veces con espera creciente.
-     */
     @Bean
     public RabbitRetryTemplateCustomizer rabbitRetryTemplateCustomizer(
             @Value("${spring.rabbitmq.listener.simple.retry.max-attempts:3}") int maxAttempts) {

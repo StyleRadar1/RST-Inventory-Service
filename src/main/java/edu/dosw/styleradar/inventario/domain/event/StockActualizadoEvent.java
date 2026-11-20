@@ -12,6 +12,7 @@ public record StockActualizadoEvent(
         UUID prendaId,
         UUID sedeId,
         String talla,
+        int stockAnterior,
         int stockDisponible,
         int stockReservado,
         Instant ocurridoEn) implements DomainEvent {

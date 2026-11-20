@@ -2,6 +2,7 @@ package edu.dosw.styleradar.inventario.infrastructure.adapter.in.amqp;
 
 import edu.dosw.styleradar.inventario.domain.port.in.SuspenderInventarioUseCase;
 import edu.dosw.styleradar.inventario.domain.port.out.EventoProcesadoPort;
+import edu.dosw.styleradar.inventario.infrastructure.config.RabbitMqConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,22 +32,30 @@ class SuscripcionEventListenerTest {
     private SuscripcionEventListener listener;
 
     @Test
-    @DisplayName("Procesa evento de suscripción suspendida con sedeId directo o anidado")
-    void procesaSuspenSionValida() {
+    @DisplayName("RES-139: Procesa styleradar.pagos.suscripcion.suspendida con sobre data (sedeId o tiendaId)")
+    void procesaSuspenSionRealPagos() {
         UUID sedeId = UUID.randomUUID();
-        Map<String, Object> payloadDirecto = Map.of(
-                "eventoId", "evt-1",
-                "sedeId", sedeId.toString());
+        Map<String, Object> payloadNqs = Map.of(
+                "eventoId", "evt-pagos-susp-1",
+                "eventType", RabbitMqConfig.ROUTING_KEY_SUSCRIPCION_SUSPENDIDA,
+                "data", Map.of("sedeId", sedeId.toString()));
 
-        when(eventoProcesadoPort.yaFueProcesado("evt-1")).thenReturn(false);
+        when(eventoProcesadoPort.yaFueProcesado("evt-pagos-susp-1")).thenReturn(false);
 
-        listener.onSuscripcionSuspendida(payloadDirecto);
+        listener.onSuscripcionSuspendida(payloadNqs);
         verify(useCase).suspenderPorSede(sedeId);
-        verify(eventoProcesadoPort).registrarProcesado(eq("evt-1"), any());
+        verify(eventoProcesadoPort).registrarProcesado(
+                "evt-pagos-susp-1", RabbitMqConfig.ROUTING_KEY_SUSCRIPCION_SUSPENDIDA);
 
-        Map<String, Object> payloadAnidado = Map.of("data", Map.of("sedeId", sedeId.toString()));
-        listener.onSuscripcionSuspendida(payloadAnidado);
-        verify(useCase, org.mockito.Mockito.times(2)).suspenderPorSede(sedeId);
+        UUID sede2 = UUID.randomUUID();
+        Map<String, Object> payloadTiendaId = Map.of(
+                "data", Map.of("eventId", "evt-pagos-susp-2", "tiendaId", sede2.toString()));
+        when(eventoProcesadoPort.yaFueProcesado("evt-pagos-susp-2")).thenReturn(false);
+
+        listener.onSuscripcionSuspendida(payloadTiendaId);
+        verify(useCase).suspenderPorSede(sede2);
+        verify(eventoProcesadoPort).registrarProcesado(
+                "evt-pagos-susp-2", RabbitMqConfig.ROUTING_KEY_SUSCRIPCION_SUSPENDIDA);
     }
 
     @Test
@@ -57,7 +66,7 @@ class SuscripcionEventListenerTest {
 
         listener.onSuscripcionSuspendida(Map.of(
                 "eventId", "evt-dup",
-                "sedeId", sedeId.toString()));
+                "data", Map.of("sedeId", sedeId.toString())));
 
         verify(useCase, never()).suspenderPorSede(any());
         verify(eventoProcesadoPort, never()).registrarProcesado(any(), any());
@@ -68,7 +77,7 @@ class SuscripcionEventListenerTest {
     void ignoraPayloadInvalido() {
         listener.onSuscripcionSuspendida(null);
         listener.onSuscripcionSuspendida(Map.of());
-        listener.onSuscripcionSuspendida(Map.of("sedeId", "no-es-uuid"));
+        listener.onSuscripcionSuspendida(Map.of("data", Map.of("sedeId", "no-es-uuid")));
 
         verify(useCase, never()).suspenderPorSede(any());
     }
