@@ -6,6 +6,10 @@ server:
       charset: UTF-8
       force: true
 
+clients:
+  item-catalogo:
+    url: ${ITEM_CATALOGO_URL:http://localhost:8220}
+
 spring:
   application:
     name: ms-inventario
@@ -20,6 +24,13 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 5000
+            read-timeout: 15000
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}

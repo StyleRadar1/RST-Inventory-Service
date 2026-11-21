@@ -28,7 +28,8 @@ public class OpenApiConfig {
                         .title("RST-Inventory-Service")
                         .version("1.0.0")
                         .description("Microservicio de Inventario y Gestión de Stock de StyleRadar. " +
-                                "Paquete 2: Catálogo · Equipo Estación RESTrepo.")
+                                "Paquete 2: Catálogo · Equipo Estación RESTrepo. " +
+                                "Las respuestas de error siguen RFC 7807 (application/problem+json) e incluyen siempre 'code' (UPPER_SNAKE_CASE) y 'timestamp' (ISO-8601).")
                         .contact(new Contact()
                                 .name("Equipo Estación RESTrepo")
                                 .email("daniel.mmartinez@mail.escuelaing.edu.co")))

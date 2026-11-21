@@ -190,13 +190,31 @@ class StockItemTest {
         assertThat(evtAgotado.stockAnterior()).isEqualTo(2);
         assertThat(evtAgotado.stockDisponible()).isEqualTo(0);
 
-        // Reposición 0 -> 8: notifica stockAnterior = 0 y stockDisponible = 8
         stockItem.actualizarStockFisico(TallaRopa.XS, Cantidad.de(8), FECHA_PUBLICACION.plusSeconds(20));
         List<DomainEvent> eventosReposicion = stockItem.pullDomainEvents();
         assertThat(eventosReposicion).hasSize(1);
         StockActualizadoEvent evtReposicion = (StockActualizadoEvent) eventosReposicion.getFirst();
         assertThat(evtReposicion.stockAnterior()).isEqualTo(0);
         assertThat(evtReposicion.stockDisponible()).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("Consultas auxiliares de disponibilidad, reserva total y búsqueda de variante")
+    void consultasAuxiliares() {
+        assertThat(stockItem.estaAgotada()).isTrue();
+        stockItem.registrarTalla(TallaRopa.M, Cantidad.de(6), FECHA_PUBLICACION);
+        stockItem.reservarStock(TallaRopa.M, Cantidad.de(2), FECHA_PUBLICACION);
+
+        assertThat(stockItem.estaAgotada()).isFalse();
+        assertThat(stockItem.getStockReservadoTotal()).isEqualTo(2);
+        assertThat(stockItem.buscarVariante(TallaRopa.M)).isPresent();
+        assertThat(stockItem.buscarVariante(TallaRopa.S)).isEmpty();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("m")).isTrue();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("  ")).isFalse();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("XL")).isFalse();
+
+        stockItem.suspenderPorMora();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("M")).isFalse();
     }
 
     @Test

@@ -20,6 +20,7 @@ import edu.dosw.styleradar.inventario.domain.port.in.RegistrarStockUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -74,9 +75,10 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "Availability successfully retrieved",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = DisponibilidadPrendaResponseDTO.class))),
-            @ApiResponse(responseCode = "404", description = "Garment not found in inventory",
+            @ApiResponse(responseCode = "404", description = "Garment not found in inventory (INVENTARIO_NO_ENCONTRADO)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
+                            schema = @Schema(implementation = ProblemDetail.class),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventario/prenda/{prendaId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
     @GetMapping("/prenda/{prendaId}")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> getByGarmentId(
@@ -92,8 +94,9 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "Verification successful",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = VerificacionDisponibilidadDTO.class))),
-            @ApiResponse(responseCode = "404", description = "Garment not found",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+            @ApiResponse(responseCode = "404", description = "Garment not found (INVENTARIO_NO_ENCONTRADO)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     })
     @GetMapping("/prenda/{prendaId}/disponibilidad")
     public ResponseEntity<VerificacionDisponibilidadDTO> verifyAvailability(
@@ -138,10 +141,10 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "201", description = "Stock successfully registered",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = StockItemResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Size incompatible with garment type or negative quantity",
+            @ApiResponse(responseCode = "400", description = "Invalid payload or incompatible size (DATOS_INVALIDOS / TALLA_INVALIDA / CANTIDAD_INVALIDA)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class))),
-            @ApiResponse(responseCode = "403", description = "Branch inventory suspended due to arrears",
+            @ApiResponse(responseCode = "403", description = "Branch inventory suspended due to arrears (INVENTARIO_SUSPENDIDO)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
@@ -153,15 +156,26 @@ public class InventarioRestController {
     }
 
     @Operation(summary = "Register stock batch of available sizes (SR-RF-52 / RES-6)",
-            description = "Allows the administrator to associate the set of sizes and initial stock offered by their establishment")
+            description = "Validates garment existence and store ownership against ms-item-catalogo and associates sizes and initial stock")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Sizes successfully associated",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = DisponibilidadPrendaResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Size incompatible with garment type or invalid data (SR-RF-52)",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "403", description = "Inventory suspended due to subscription arrears",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+            @ApiResponse(responseCode = "400", description = "Invalid data or size incompatible with garment type (DATOS_INVALIDOS / TALLA_INVALIDA / CANTIDAD_INVALIDA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Inventory suspended (INVENTARIO_SUSPENDIDO) or garment belongs to another store (PRENDA_DE_OTRO_ALMACEN)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Prenda no pertenece a la sede\",\"status\":403,\"detail\":\"La prenda ... no pertenece al almacén de la sede ...\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"PRENDA_DE_OTRO_ALMACEN\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
+            @ApiResponse(responseCode = "404", description = "Garment does not exist in ms-item-catalogo (PRENDA_NO_ENCONTRADA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"La prenda ... no existe en ms-item-catalogo\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"PRENDA_NO_ENCONTRADA\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
+            @ApiResponse(responseCode = "503", description = "ms-item-catalogo service unavailable (CATALOGO_NO_DISPONIBLE)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Servicio de catálogo no disponible\",\"status\":503,\"detail\":\"El servicio de catálogo (ms-item-catalogo) no está disponible\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"CATALOGO_NO_DISPONIBLE\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
     @PostMapping("/lote")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> registerBatch(
@@ -176,10 +190,12 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "Stock successfully adjusted",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = StockItemResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid data",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "404", description = "Item or size not found",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+            @ApiResponse(responseCode = "400", description = "Invalid data (DATOS_INVALIDOS / TALLA_INVALIDA / CANTIDAD_INVALIDA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Item or size not found (INVENTARIO_NO_ENCONTRADO / TALLA_NO_REGISTRADA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PutMapping("/{id}/ajuste")
     public ResponseEntity<StockItemResponseDTO> adjustStock(
@@ -197,12 +213,15 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "Availability successfully updated",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = StockItemResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Negative units or invalid size",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "403", description = "Branch suspended due to arrears",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "404", description = "Garment, branch, or size not registered",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+            @ApiResponse(responseCode = "400", description = "Negative units or invalid size (DATOS_INVALIDOS / TALLA_INVALIDA / CANTIDAD_INVALIDA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Branch suspended due to arrears (INVENTARIO_SUSPENDIDO)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Garment, branch, or size not registered (INVENTARIO_NO_ENCONTRADO / TALLA_NO_REGISTRADA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PatchMapping("/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}")
     public ResponseEntity<StockItemResponseDTO> updateSizeAvailability(
@@ -224,11 +243,13 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "Successful reservation",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = ReservaResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid reservation parameters",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "404", description = "Inventory not found",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "409", description = "Insufficient stock to satisfy the reservation",
+            @ApiResponse(responseCode = "400", description = "Invalid reservation parameters (DATOS_INVALIDOS / TALLA_INVALIDA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Inventory not found (INVENTARIO_NO_ENCONTRADO / TALLA_NO_REGISTRADA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Insufficient stock to satisfy the reservation (STOCK_INSUFICIENTE)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
@@ -243,12 +264,15 @@ public class InventarioRestController {
             description = "Definitively deducts reserved units after payment approval")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reservation confirmed"),
-            @ApiResponse(responseCode = "400", description = "Invalid data",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "404", description = "Inventory not found",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "409", description = "Insufficient reserved stock",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+            @ApiResponse(responseCode = "400", description = "Invalid data (DATOS_INVALIDOS)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Inventory not found (INVENTARIO_NO_ENCONTRADO / TALLA_NO_REGISTRADA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Insufficient reserved stock (STOCK_INSUFICIENTE)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping("/reserva/confirmar")
     public ResponseEntity<Void> confirmReservation(@Valid @RequestBody ConfirmarReservaCommand command) {
@@ -260,10 +284,12 @@ public class InventarioRestController {
             description = "Returns reserved units to available stock due to rejection, cancellation, or expiration")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reservation released"),
-            @ApiResponse(responseCode = "400", description = "Invalid data",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE)),
-            @ApiResponse(responseCode = "404", description = "Inventory not found",
-                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+            @ApiResponse(responseCode = "400", description = "Invalid data (DATOS_INVALIDOS)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Inventory not found (INVENTARIO_NO_ENCONTRADO / TALLA_NO_REGISTRADA)",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping("/reserva/liberar")
     public ResponseEntity<Void> releaseReservation(@Valid @RequestBody LiberarReservaCommand command) {

@@ -44,7 +44,7 @@ public class OrdenPagoEventListener {
             return;
         }
 
-        List<ConfirmarReservaCommand> comandos = construirConfirmaciones(payload);
+        List<ConfirmarReservaCommand> comandos = extraerComandos(payload, ConfirmarReservaCommand::new);
         if (comandos.isEmpty()) {
             log.warn("Payload de {} incompleto o sin items válidos: {}",
                     RabbitMqConfig.ROUTING_KEY_PAGO_CONFIRMADO, payload);
@@ -70,18 +70,18 @@ public class OrdenPagoEventListener {
             log.info("Evento de pago rechazado duplicado (eventId={}), omitiendo.", eventId);
             return;
         }
-        LiberarReservaCommand command = construirLiberar(payload);
-        if (command == null) {
-            log.warn("Payload de pago rechazado incompleto: {}", payload);
+        List<LiberarReservaCommand> comandos = extraerComandos(payload, LiberarReservaCommand::new);
+        if (comandos.isEmpty()) {
+            log.warn("Payload de pago rechazado incompleto o sin items válidos: {}", payload);
             return;
         }
-        gestionarReservaUseCase.liberar(command);
+        comandos.forEach(gestionarReservaUseCase::liberar);
         if (eventId != null) {
             eventoProcesadoPort.registrarProcesado(eventId, RabbitMqConfig.ROUTING_KEY_PAGO_RECHAZADO_PENDIENTE);
         }
     }
 
-    private List<ConfirmarReservaCommand> construirConfirmaciones(Map<String, Object> payload) {
+    private <T> List<T> extraerComandos(Map<String, Object> payload, ItemCommandFactory<T> factory) {
         if (payload == null) {
             return List.of();
         }
@@ -90,10 +90,10 @@ public class OrdenPagoEventListener {
 
         Object itemsObj = origenData.get("items");
         if (itemsObj instanceof List<?> lista) {
-            List<ConfirmarReservaCommand> resultado = new ArrayList<>();
+            List<T> resultado = new ArrayList<>();
             for (Object elemento : lista) {
                 if (elemento instanceof Map<?, ?> itemMap) {
-                    ConfirmarReservaCommand cmd = construirConfirmarDesdeMapa(itemMap, sedeGlobal);
+                    T cmd = construirDesdeMapa(itemMap, sedeGlobal, factory);
                     if (cmd != null) {
                         resultado.add(cmd);
                     }
@@ -102,11 +102,11 @@ public class OrdenPagoEventListener {
             return resultado;
         }
 
-        ConfirmarReservaCommand unico = construirConfirmarDesdeMapa(payload, sedeGlobal);
+        T unico = construirDesdeMapa(payload, sedeGlobal, factory);
         return unico == null ? List.of() : List.of(unico);
     }
 
-    private ConfirmarReservaCommand construirConfirmarDesdeMapa(Map<?, ?> mapa, UUID sedeFallback) {
+    private <T> T construirDesdeMapa(Map<?, ?> mapa, UUID sedeFallback, ItemCommandFactory<T> factory) {
         UUID prendaId = SuscripcionEventListener.extraerUuid(mapa, "prendaId");
         UUID sedeId = SuscripcionEventListener.extraerUuid(mapa, "sedeId", "tiendaId");
         if (sedeId == null) {
@@ -115,22 +115,11 @@ public class OrdenPagoEventListener {
         String talla = extraerTexto(mapa, "talla");
         Integer cantidad = extraerEntero(mapa, "cantidad");
 
-        if (prendaId == null || sedeId == null || talla == null || cantidad == null || cantidad <= 0) {
+        if (prendaId == null || sedeId == null || talla == null || talla.isBlank()
+                || cantidad == null || cantidad <= 0) {
             return null;
         }
-        return new ConfirmarReservaCommand(prendaId, sedeId, talla, cantidad);
-    }
-
-    private LiberarReservaCommand construirLiberar(Map<String, Object> payload) {
-        UUID prendaId = SuscripcionEventListener.extraerUuid(payload, "prendaId");
-        UUID sedeId = SuscripcionEventListener.extraerUuid(payload, "sedeId", "tiendaId");
-        String talla = extraerTexto(payload, "talla");
-        Integer cantidad = extraerEntero(payload, "cantidad");
-
-        if (prendaId == null || sedeId == null || talla == null || cantidad == null || cantidad <= 0) {
-            return null;
-        }
-        return new LiberarReservaCommand(prendaId, sedeId, talla, cantidad);
+        return factory.crear(prendaId, sedeId, talla, cantidad);
     }
 
     static String extraerTexto(Map<?, ?> payload, String clave) {
@@ -171,5 +160,10 @@ public class OrdenPagoEventListener {
             }
         }
         return null;
+    }
+
+    @FunctionalInterface
+    private interface ItemCommandFactory<T> {
+        T crear(UUID prendaId, UUID sedeId, String talla, Integer cantidad);
     }
 }
