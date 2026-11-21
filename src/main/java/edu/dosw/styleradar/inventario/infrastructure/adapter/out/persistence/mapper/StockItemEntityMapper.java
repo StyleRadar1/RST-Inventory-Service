@@ -11,7 +11,6 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -49,7 +48,6 @@ public interface StockItemEntityMapper {
         if (entity == null || domain == null) {
             return;
         }
-        // Delegación en el método abstracto generado por MapStruct
         copiarCabecera(domain, entity);
 
         Map<String, InventarioVariante> variantesDominio = domain.getVariantes();

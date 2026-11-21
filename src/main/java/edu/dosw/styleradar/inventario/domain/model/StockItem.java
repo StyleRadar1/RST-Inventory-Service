@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -197,7 +198,7 @@ public class StockItem {
         }
         InventarioVariante variante = variantes.get(talla.trim());
         if (variante == null) {
-            variante = variantes.get(talla.trim().toUpperCase());
+            variante = variantes.get(talla.trim().toUpperCase(Locale.ROOT));
         }
         return variante != null && variante.getStockDisponible().valor() > 0;
     }
@@ -314,12 +315,10 @@ public class StockItem {
     private void evaluarEventosDeStock(InventarioVariante variante, int stockAnterior, Instant ahora) {
         int stockRestante = variante.getStockDisponible().valor();
 
-        // Emisión oficial: styleradar.inventario.actualizado (incluye stockAnterior)
         domainEvents.add(new StockActualizadoEvent(UUID.randomUUID(), prendaId, sedeId,
                 variante.getTalla().getValor(), stockAnterior, stockRestante,
                 variante.getStockReservado().valor(), ahora));
 
-        // Emisión por umbral crítico
         if (stockRestante == 0) {
             domainEvents.add(new StockAgotadoEvent(UUID.randomUUID(), prendaId, sedeId,
                     variante.getTalla().getValor(), stockRestante, ahora));

@@ -15,19 +15,22 @@ import edu.dosw.styleradar.inventario.application.dto.SedeStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
-import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
-import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
-import edu.dosw.styleradar.inventario.domain.port.in.FiltrarPrendasPorTallaUseCase;
-import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
-import edu.dosw.styleradar.inventario.domain.port.in.RegistrarLoteStockUseCase;
-import edu.dosw.styleradar.inventario.domain.port.in.RegistrarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.exception.CatalogoNoDisponibleException;
 import edu.dosw.styleradar.inventario.domain.exception.InventarioSuspendidoException;
+import edu.dosw.styleradar.inventario.domain.exception.PrendaDeOtroAlmacenException;
+import edu.dosw.styleradar.inventario.domain.exception.PrendaNoEncontradaEnCatalogoException;
 import edu.dosw.styleradar.inventario.domain.exception.ResourceNotFoundException;
 import edu.dosw.styleradar.inventario.domain.exception.StockInsuficienteException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaConUnidadesException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaInvalidaException;
 import edu.dosw.styleradar.inventario.domain.model.EstadoItem;
 import edu.dosw.styleradar.inventario.domain.model.TipoPrenda;
+import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.FiltrarPrendasPorTallaUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.RegistrarLoteStockUseCase;
+import edu.dosw.styleradar.inventario.domain.port.in.RegistrarStockUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -182,6 +185,60 @@ class InventarioRestControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/inventario/lote retorna 404 PRENDA_NO_ENCONTRADA si no existe en catálogo")
+    void registrarLotePrendaNoExisteRetorna404() throws Exception {
+        RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
+                UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA,
+                List.of(new ItemTallaCantidadDTO("M", 10)), Instant.now());
+
+        when(registrarLoteStockUseCase.registrarLote(any()))
+                .thenThrow(new PrendaNoEncontradaEnCatalogoException("No existe en catálogo"));
+
+        mockMvc.perform(post("/api/v1/inventario/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(command)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PRENDA_NO_ENCONTRADA"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/inventario/lote retorna 403 PRENDA_DE_OTRO_ALMACEN si la sede no coincide")
+    void registrarLotePrendaOtroAlmacenRetorna403() throws Exception {
+        RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
+                UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA,
+                List.of(new ItemTallaCantidadDTO("M", 10)), Instant.now());
+
+        when(registrarLoteStockUseCase.registrarLote(any()))
+                .thenThrow(new PrendaDeOtroAlmacenException("Pertenece a otro almacén"));
+
+        mockMvc.perform(post("/api/v1/inventario/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(command)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PRENDA_DE_OTRO_ALMACEN"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/inventario/lote retorna 503 CATALOGO_NO_DISPONIBLE si ms-item-catalogo no responde")
+    void registrarLoteCatalogoNoDisponibleRetorna503() throws Exception {
+        RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
+                UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA,
+                List.of(new ItemTallaCantidadDTO("M", 10)), Instant.now());
+
+        when(registrarLoteStockUseCase.registrarLote(any()))
+                .thenThrow(new CatalogoNoDisponibleException("Catálogo caído"));
+
+        mockMvc.perform(post("/api/v1/inventario/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(command)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("CATALOGO_NO_DISPONIBLE"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
     @DisplayName("PUT /api/v1/inventario/{id}/ajuste actualiza stock y retorna 200 OK")
     void ajustarStockExitoso() throws Exception {
         UUID itemId = UUID.randomUUID();
@@ -253,7 +310,9 @@ class InventarioRestControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Stock insuficiente"));
+                .andExpect(jsonPath("$.title").value("Stock insuficiente"))
+                .andExpect(jsonPath("$.code").value("STOCK_INSUFICIENTE"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
@@ -283,7 +342,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("Validación Bean Validation retorna 400 Bad Request con mapa de errores")
+    @DisplayName("Validación Bean Validation retorna 400 Bad Request con mapa de errores y código")
     void validacionCamposRetorna400() throws Exception {
         RegistrarStockCommand commandInvalido = new RegistrarStockCommand(
                 null, null, TipoPrenda.ROPA, "", -1, null);
@@ -292,6 +351,8 @@ class InventarioRestControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(commandInvalido)))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DATOS_INVALIDOS"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
                 .andExpect(jsonPath("$.errors").exists());
     }
 
@@ -305,7 +366,9 @@ class InventarioRestControllerTest {
         mockMvc.perform(put("/api/v1/inventario/{id}/ajuste", itemId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"talla\":\"M\",\"nuevaCantidad\":5}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("INVENTARIO_NO_ENCONTRADO"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
@@ -321,7 +384,9 @@ class InventarioRestControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Talla inválida"));
+                .andExpect(jsonPath("$.title").value("Talla inválida"))
+                .andExpect(jsonPath("$.code").value("TALLA_INVALIDA"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
@@ -333,7 +398,9 @@ class InventarioRestControllerTest {
         mockMvc.perform(put("/api/v1/inventario/{id}/ajuste", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"talla\":\"M\",\"nuevaCantidad\":5}"))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("TALLA_CON_UNIDADES"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
@@ -348,6 +415,8 @@ class InventarioRestControllerTest {
         mockMvc.perform(post("/api/v1/inventario")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("INVENTARIO_SUSPENDIDO"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 }

@@ -1,3 +1,7 @@
+clients:
+  item-catalogo:
+    url: http://localhost:18220
+
 spring:
   application:
     name: ms-inventario-test

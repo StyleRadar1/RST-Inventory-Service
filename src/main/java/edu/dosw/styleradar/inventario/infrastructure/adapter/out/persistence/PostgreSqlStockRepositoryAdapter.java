@@ -1,7 +1,7 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence;
 
-import edu.dosw.styleradar.inventario.domain.port.out.StockRepositoryPort;
 import edu.dosw.styleradar.inventario.domain.model.StockItem;
+import edu.dosw.styleradar.inventario.domain.port.out.StockRepositoryPort;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.entity.StockItemJpaEntity;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.mapper.StockItemEntityMapper;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.repository.SpringDataStockItemRepository;
@@ -34,6 +34,12 @@ public class PostgreSqlStockRepositoryAdapter implements StockRepositoryPort {
     @Transactional(readOnly = true)
     public Optional<StockItem> buscarPorPrendaYSede(UUID prendaId, UUID sedeId) {
         return repository.findByPrendaIdAndSedeId(prendaId, sedeId).map(entityMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Optional<StockItem> buscarPorPrendaYSedeConBloqueo(UUID prendaId, UUID sedeId) {
+        return repository.buscarPorPrendaYSedeConBloqueo(prendaId, sedeId).map(entityMapper::toDomain);
     }
 
     @Override
