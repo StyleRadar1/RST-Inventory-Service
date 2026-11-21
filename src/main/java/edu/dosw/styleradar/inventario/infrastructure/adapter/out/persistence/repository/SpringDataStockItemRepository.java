@@ -35,7 +35,6 @@ public interface SpringDataStockItemRepository extends JpaRepository<StockItemJp
     List<StockItemJpaEntity> buscarPrendasDisponiblesPorTalla(@Param("talla") String talla, @Param("sedeId") UUID sedeId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "variantes")
     @Query("SELECT s FROM StockItemJpaEntity s WHERE s.prendaId = :prendaId AND s.sedeId = :sedeId")
     Optional<StockItemJpaEntity> buscarPorPrendaYSedeConBloqueo(@Param("prendaId") UUID prendaId,
                                                                  @Param("sedeId") UUID sedeId);

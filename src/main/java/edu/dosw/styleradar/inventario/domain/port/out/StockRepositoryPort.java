@@ -12,6 +12,8 @@ public interface StockRepositoryPort {
 
     Optional<StockItem> buscarPorPrendaYSede(UUID prendaId, UUID sedeId);
 
+    Optional<StockItem> buscarPorPrendaYSedeConBloqueo(UUID prendaId, UUID sedeId);
+
     List<StockItem> buscarPorPrenda(UUID prendaId);
 
     List<StockItem> buscarPorSede(UUID sedeId);

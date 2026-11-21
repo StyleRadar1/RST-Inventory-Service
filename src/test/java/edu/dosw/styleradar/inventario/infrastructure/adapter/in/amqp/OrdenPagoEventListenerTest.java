@@ -118,6 +118,26 @@ class OrdenPagoEventListenerTest {
     }
 
     @Test
+    @DisplayName("Procesa pago rechazado con lista data.items")
+    void procesaPagoRechazadoConListaItems() {
+        UUID prenda1 = UUID.randomUUID();
+        UUID sedeId = UUID.randomUUID();
+        Map<String, Object> payload = Map.of(
+                "eventId", "evt-rechazado-items-1",
+                "data", Map.of(
+                        "sedeId", sedeId.toString(),
+                        "items", List.of(Map.of("prendaId", prenda1.toString(), "talla", "M", "cantidad", 2))));
+
+        when(eventoProcesadoPort.yaFueProcesado("evt-rechazado-items-1")).thenReturn(false);
+
+        listener.onPagoRechazado(payload);
+
+        verify(useCase).liberar(any(LiberarReservaCommand.class));
+        verify(eventoProcesadoPort).registrarProcesado(
+                "evt-rechazado-items-1", RabbitMqConfig.ROUTING_KEY_PAGO_RECHAZADO_PENDIENTE);
+    }
+
+    @Test
     @DisplayName("Omite eventos duplicados de pago confirmado y rechazado")
     void omiteEventosDuplicados() {
         when(eventoProcesadoPort.yaFueProcesado("dup-1")).thenReturn(true);
