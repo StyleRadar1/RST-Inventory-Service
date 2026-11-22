@@ -17,6 +17,11 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:inventario_db}?sslmode=${DB_SSL_MODE:prefer}
     username: ${DB_USER:styleradar_user}
     password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:3}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      idle-timeout: 60000
+      initialization-fail-timeout: ${DB_INIT_FAIL_TIMEOUT:60000}
   jpa:
     open-in-view: false
     hibernate:
