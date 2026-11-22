@@ -6,6 +6,9 @@ import edu.dosw.styleradar.inventario.domain.event.StockAgotadoEvent;
 import edu.dosw.styleradar.inventario.domain.event.StockBajoEvent;
 import edu.dosw.styleradar.inventario.domain.port.out.StockEventPublisherPort;
 import edu.dosw.styleradar.inventario.infrastructure.config.RabbitMqConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +20,8 @@ import java.util.Map;
  */
 @Component
 public class RabbitMqStockEventPublisherAdapter implements StockEventPublisherPort {
+
+    private static final Logger log = LoggerFactory.getLogger(RabbitMqStockEventPublisherAdapter.class);
 
     private final RabbitTemplate rabbitTemplate;
 
@@ -61,6 +66,10 @@ public class RabbitMqStockEventPublisherAdapter implements StockEventPublisherPo
         }
 
         payload.put("data", data);
-        rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_EVENTS, evento.getEventType(), payload);
+        try {
+            rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_EVENTS, evento.getEventType(), payload);
+        } catch (AmqpException e) {
+            log.warn("No se pudo publicar {} del evento {}: {}", evento.getEventType(), evento.getEventId(), e.getMessage());
+        }
     }
 }

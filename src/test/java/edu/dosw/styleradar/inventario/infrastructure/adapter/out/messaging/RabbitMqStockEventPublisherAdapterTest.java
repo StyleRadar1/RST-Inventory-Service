@@ -11,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.AmqpConnectException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.time.Instant;
@@ -18,6 +19,10 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -100,5 +105,16 @@ class RabbitMqStockEventPublisherAdapterTest {
     void ignoraEventoNulo() {
         publisher.publicar(null);
         verifyNoInteractions(rabbitTemplate);
+    }
+
+    @Test
+    @DisplayName("Si no hay broker el evento no se publica y la operación no falla")
+    void sinBrokerNoFallaLaOperacion() {
+        doThrow(new AmqpConnectException(new java.net.ConnectException("Connection refused")))
+                .when(rabbitTemplate).convertAndSend(anyString(), anyString(), any(Object.class));
+        StockAgotadoEvent evento = new StockAgotadoEvent(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "L", 0, Instant.now());
+
+        assertThatCode(() -> publisher.publicar(evento)).doesNotThrowAnyException();
     }
 }
