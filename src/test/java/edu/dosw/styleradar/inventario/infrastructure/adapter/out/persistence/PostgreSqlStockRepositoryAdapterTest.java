@@ -1,5 +1,6 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence;
 
+import edu.dosw.styleradar.inventario.domain.model.EstadoItem;
 import edu.dosw.styleradar.inventario.domain.model.StockItem;
 import edu.dosw.styleradar.inventario.domain.model.TipoPrenda;
 import edu.dosw.styleradar.inventario.domain.valueobject.Cantidad;
@@ -61,7 +62,7 @@ class PostgreSqlStockRepositoryAdapterTest {
         entity.setPrendaId(prendaId);
         entity.setSedeId(sedeId);
         entity.setTipoPrenda(TipoPrenda.ROPA);
-        entity.setEstado(edu.dosw.styleradar.inventario.domain.model.EstadoItem.DISPONIBLE);
+        entity.setEstado(EstadoItem.DISPONIBLE);
         entity.setUmbralUltimasUnidades(3);
         entity.setActivo(true);
         entity.setFechaPublicacion(ahora);
@@ -91,7 +92,7 @@ class PostgreSqlStockRepositoryAdapterTest {
         entity.setPrendaId(prendaId);
         entity.setSedeId(sedeId);
         entity.setTipoPrenda(TipoPrenda.ROPA);
-        entity.setEstado(edu.dosw.styleradar.inventario.domain.model.EstadoItem.DISPONIBLE);
+        entity.setEstado(EstadoItem.DISPONIBLE);
         entity.setUmbralUltimasUnidades(3);
         entity.setActivo(true);
         entity.setFechaPublicacion(ahora);
@@ -104,6 +105,47 @@ class PostgreSqlStockRepositoryAdapterTest {
         assertThat(adapter.buscarPorPrendaYSede(prendaId, sedeId)).isPresent();
         assertThat(adapter.buscarPorPrenda(prendaId)).hasSize(1);
         assertThat(adapter.buscarPorSede(sedeId)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("buscarPorPrendaYSedeConBloqueo, buscarDisponiblesPorSede y buscarPrendasDisponiblesPorTalla")
+    void consultasDeBloqueoYDisponibilidad() {
+        StockItemJpaEntity activoConStock = new StockItemJpaEntity();
+        activoConStock.setId(itemId);
+        activoConStock.setPrendaId(prendaId);
+        activoConStock.setSedeId(sedeId);
+        activoConStock.setTipoPrenda(TipoPrenda.ROPA);
+        activoConStock.setEstado(EstadoItem.DISPONIBLE);
+        activoConStock.setUmbralUltimasUnidades(3);
+        activoConStock.setActivo(true);
+        activoConStock.setFechaPublicacion(ahora);
+        activoConStock.setFechaActualizacion(ahora);
+
+        InventarioVarianteJpaEntity varM = new InventarioVarianteJpaEntity();
+        varM.setId(UUID.randomUUID());
+        varM.setTalla("M");
+        varM.setUnidadesDisponibles(4);
+        varM.setUnidadesReservadas(0);
+        activoConStock.agregarVariante(varM);
+
+        StockItemJpaEntity suspendido = new StockItemJpaEntity();
+        suspendido.setId(UUID.randomUUID());
+        suspendido.setPrendaId(UUID.randomUUID());
+        suspendido.setSedeId(sedeId);
+        suspendido.setTipoPrenda(TipoPrenda.ROPA);
+        suspendido.setEstado(EstadoItem.SUSPENDIDO);
+        suspendido.setUmbralUltimasUnidades(3);
+        suspendido.setActivo(false);
+        suspendido.setFechaPublicacion(ahora);
+        suspendido.setFechaActualizacion(ahora);
+
+        when(repository.buscarPorPrendaYSedeConBloqueo(prendaId, sedeId)).thenReturn(Optional.of(activoConStock));
+        when(repository.findBySedeId(sedeId)).thenReturn(List.of(activoConStock, suspendido));
+        when(repository.buscarPrendasDisponiblesPorTalla("M", sedeId)).thenReturn(List.of(activoConStock));
+
+        assertThat(adapter.buscarPorPrendaYSedeConBloqueo(prendaId, sedeId)).isPresent();
+        assertThat(adapter.buscarDisponiblesPorSede(sedeId)).hasSize(1);
+        assertThat(adapter.buscarPrendasDisponiblesPorTalla("M", sedeId)).hasSize(1);
     }
 
     @Test

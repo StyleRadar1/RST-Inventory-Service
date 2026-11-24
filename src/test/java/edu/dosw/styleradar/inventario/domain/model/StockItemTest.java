@@ -163,20 +163,58 @@ class StockItemTest {
     }
 
     @Test
-    @DisplayName("Disparo y extracción de eventos de dominio StockActualizado, StockAgotado y StockBajo")
+    @DisplayName("Disparo de StockActualizado (con stockAnterior), StockAgotado y StockBajo")
     void disparoDeEventosDeDominio() {
         stockItem.registrarTalla(TallaRopa.XS, Cantidad.de(2), FECHA_PUBLICACION);
         List<DomainEvent> eventosBajo = stockItem.pullDomainEvents();
         assertThat(eventosBajo).hasSize(2);
         assertThat(eventosBajo).anyMatch(e -> e instanceof StockBajoEvent);
-        assertThat(eventosBajo).anyMatch(e -> e instanceof StockActualizadoEvent);
+        StockActualizadoEvent evtRegistro = eventosBajo.stream()
+                .filter(StockActualizadoEvent.class::isInstance)
+                .map(StockActualizadoEvent.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertThat(evtRegistro.stockAnterior()).isEqualTo(0);
+        assertThat(evtRegistro.stockDisponible()).isEqualTo(2);
         assertThat(stockItem.pullDomainEvents()).isEmpty();
 
         stockItem.actualizarStockFisico(TallaRopa.XS, Cantidad.cero(), FECHA_PUBLICACION.plusSeconds(10));
         List<DomainEvent> eventosAgotado = stockItem.pullDomainEvents();
         assertThat(eventosAgotado).hasSize(2);
         assertThat(eventosAgotado).anyMatch(e -> e instanceof StockAgotadoEvent);
-        assertThat(eventosAgotado).anyMatch(e -> e instanceof StockActualizadoEvent);
+        StockActualizadoEvent evtAgotado = eventosAgotado.stream()
+                .filter(StockActualizadoEvent.class::isInstance)
+                .map(StockActualizadoEvent.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertThat(evtAgotado.stockAnterior()).isEqualTo(2);
+        assertThat(evtAgotado.stockDisponible()).isEqualTo(0);
+
+        stockItem.actualizarStockFisico(TallaRopa.XS, Cantidad.de(8), FECHA_PUBLICACION.plusSeconds(20));
+        List<DomainEvent> eventosReposicion = stockItem.pullDomainEvents();
+        assertThat(eventosReposicion).hasSize(1);
+        StockActualizadoEvent evtReposicion = (StockActualizadoEvent) eventosReposicion.getFirst();
+        assertThat(evtReposicion.stockAnterior()).isEqualTo(0);
+        assertThat(evtReposicion.stockDisponible()).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("Consultas auxiliares de disponibilidad, reserva total y búsqueda de variante")
+    void consultasAuxiliares() {
+        assertThat(stockItem.estaAgotada()).isTrue();
+        stockItem.registrarTalla(TallaRopa.M, Cantidad.de(6), FECHA_PUBLICACION);
+        stockItem.reservarStock(TallaRopa.M, Cantidad.de(2), FECHA_PUBLICACION);
+
+        assertThat(stockItem.estaAgotada()).isFalse();
+        assertThat(stockItem.getStockReservadoTotal()).isEqualTo(2);
+        assertThat(stockItem.buscarVariante(TallaRopa.M)).isPresent();
+        assertThat(stockItem.buscarVariante(TallaRopa.S)).isEmpty();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("m")).isTrue();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("  ")).isFalse();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("XL")).isFalse();
+
+        stockItem.suspenderPorMora();
+        assertThat(stockItem.tieneStockDisponibleEnTalla("M")).isFalse();
     }
 
     @Test

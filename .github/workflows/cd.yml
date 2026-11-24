@@ -12,6 +12,10 @@ on:
         type: choice
         options: [qa, prod]
 
+concurrency:
+  group: cd-${{ github.ref_name }}-${{ inputs.ambiente || 'auto' }}
+  cancel-in-progress: false
+
 env:
   APP_PORT: 8200
   DB_NAME: inventario_db
@@ -19,6 +23,7 @@ env:
   RESOURCE_GROUP: STYLE_RADAR_PROD_RG
   CONTAINERAPP_ENV: styleradar-cae-prod
   DB_SERVER: styleradar-postgres-prod
+  RABBITMQ_HOST_QA: styleradar-rabbitmq-qa.northcentralus.cloudapp.azure.com
 
 permissions:
   contents: read
@@ -73,8 +78,23 @@ jobs:
 
       - name: Desplegar el contenedor
         run: |
-          DOMINIO=$(az containerapp env show --name "$CONTAINERAPP_ENV" --resource-group "$RESOURCE_GROUP" --query properties.defaultDomain -o tsv)
           AMBIENTE=${{ steps.vars.outputs.ambiente }}
+          ITEM_CATALOGO_URL="https://rst-itemcatalog-service-qa.redwave-74d6e30f.northcentralus.azurecontainerapps.io"
+          if [ "$AMBIENTE" = "prod" ]; then
+            ITEM_CATALOGO_URL="https://rst-itemcatalog-service-prod.redwave-74d6e30f.northcentralus.azurecontainerapps.io"
+          fi
+          BROKER=()
+          if [ "$AMBIENTE" = "qa" ]; then
+            BROKER=(
+              RABBITMQ_HOST="$RABBITMQ_HOST_QA"
+              RABBITMQ_PORT=5671
+              RABBITMQ_VHOST=/
+              RABBITMQ_USER=ms_inventario
+              RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}"
+              RABBITMQ_SSL_ENABLED=true
+              RABBITMQ_SSL_VERIFY_HOSTNAME=false
+            )
+          fi
           az containerapp up \
             --name "${{ steps.vars.outputs.app }}" \
             --resource-group "$RESOURCE_GROUP" \
@@ -93,7 +113,29 @@ jobs:
               DB_NAME="$DB_NAME" \
               DB_USER=styleradar_admin \
               DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
-              SPRING_PROFILES_ACTIVE="$AMBIENTE"
+              DB_SSL_MODE=require \
+              SPRING_PROFILES_ACTIVE="$AMBIENTE" \
+              ITEM_CATALOGO_URL="$ITEM_CATALOGO_URL" \
+              "${BROKER[@]}"
+
+      - name: Mantener una réplica activa
+        run: az containerapp update --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --min-replicas 1
+
+      - name: Esperar al health antes de enviar tráfico
+        continue-on-error: true
+        run: |
+          ID=$(az containerapp show --name "${{ steps.vars.outputs.app }}" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
+          URL="https://management.azure.com$ID?api-version=2024-03-01"
+          TEMPLATE=$(az rest --method get --url "$URL" --query properties.template -o json)
+          if [ "$(echo "$TEMPLATE" | jq '[.containers[0].probes[]?.type] | index("Readiness") != null')" = "true" ]; then
+            echo "Las sondas ya están configuradas"
+            exit 0
+          fi
+          NUEVO=$(echo "$TEMPLATE" | jq --argjson port "$APP_PORT" '.containers[0].probes = [
+            {"type": "Startup", "httpGet": {"path": "/api/v1/health", "port": $port}, "initialDelaySeconds": 10, "periodSeconds": 10, "failureThreshold": 30},
+            {"type": "Readiness", "httpGet": {"path": "/api/v1/health", "port": $port}, "periodSeconds": 10, "failureThreshold": 3}
+          ]')
+          az rest --method patch --url "$URL" --body "{\"properties\": {\"template\": $NUEVO}}"
 
       - name: Verificar el health
         run: |

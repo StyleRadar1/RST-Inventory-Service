@@ -4,12 +4,12 @@ import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.LiberarReservaCommand;
 import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
-import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
-import edu.dosw.styleradar.inventario.domain.port.out.StockEventPublisherPort;
-import edu.dosw.styleradar.inventario.domain.port.out.StockRepositoryPort;
 import edu.dosw.styleradar.inventario.domain.exception.ResourceNotFoundException;
 import edu.dosw.styleradar.inventario.domain.model.InventarioVariante;
 import edu.dosw.styleradar.inventario.domain.model.StockItem;
+import edu.dosw.styleradar.inventario.domain.port.in.GestionarReservaUseCase;
+import edu.dosw.styleradar.inventario.domain.port.out.StockEventPublisherPort;
+import edu.dosw.styleradar.inventario.domain.port.out.StockRepositoryPort;
 import edu.dosw.styleradar.inventario.domain.valueobject.Cantidad;
 import edu.dosw.styleradar.inventario.domain.valueobject.Talla;
 import org.springframework.stereotype.Service;
@@ -73,7 +73,8 @@ public class GestionarReservaUseCaseImpl implements GestionarReservaUseCase {
     }
 
     private StockItem buscarPorPrendaYSede(UUID prendaId, UUID sedeId) {
-        return stockRepository.buscarPorPrendaYSede(prendaId, sedeId)
-                .orElseThrow(() -> new ResourceNotFoundException("No se encontró inventario para la prenda " + prendaId + " en la sede " + sedeId));
+        return stockRepository.buscarPorPrendaYSedeConBloqueo(prendaId, sedeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No se encontró inventario para la prenda " + prendaId + " en la sede " + sedeId));
     }
 }

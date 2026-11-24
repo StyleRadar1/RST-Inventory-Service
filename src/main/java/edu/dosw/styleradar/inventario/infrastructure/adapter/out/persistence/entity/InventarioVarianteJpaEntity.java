@@ -28,7 +28,7 @@ public class InventarioVarianteJpaEntity {
     @JoinColumn(name = "inventario_item_id", nullable = false)
     private StockItemJpaEntity inventarioItem;
 
-    @Column(name = "talla", nullable = false, length = 5)
+    @Column(name = "talla", nullable = false, length = 10)
     private String talla;
 
     @Column(name = "unidades_disponibles", nullable = false)
