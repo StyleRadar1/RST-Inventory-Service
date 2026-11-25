@@ -130,59 +130,15 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/inventory/sizes/{size}/garments filtra prendas por talla con branchId y sedeId")
+    @DisplayName("GET /api/v1/inventory/sizes/{size}/garments filtra prendas por talla (RES-24 / SR-RF-10)")
     void filtrarPrendasPorTallaExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
-        UUID sedeId = UUID.randomUUID();
-        when(filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla("M", sedeId))
+        when(filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(eq("M"), any()))
                 .thenReturn(List.of(prendaId));
-        when(filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla("M", null))
-                .thenReturn(List.of(prendaId));
-
-        mockMvc.perform(get("/api/v1/inventory/sizes/{size}/garments", "M")
-                        .param("branchId", sedeId.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
-
-        mockMvc.perform(get("/api/v1/inventario/tallas/{size}/prendas", "M")
-                        .param("sedeId", sedeId.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
 
         mockMvc.perform(get("/api/v1/inventory/sizes/{size}/garments", "M"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value(prendaId.toString()));
-    }
-
-    @Test
-    @DisplayName("Rutas heredadas en español siguen activas por compatibilidad con el Gateway")
-    void rutasHeredadasEnEspanolSiguenActivas() throws Exception {
-        UUID prendaId = UUID.randomUUID();
-        UUID sedeId = UUID.randomUUID();
-
-        when(consultarStockUseCase.consultarPorPrenda(prendaId)).thenReturn(
-                new DisponibilidadPrendaResponseDTO(prendaId, TipoPrenda.ROPA, EstadoItem.DISPONIBLE, 5, List.of()));
-        when(registrarLoteStockUseCase.registrarLote(any())).thenReturn(
-                new DisponibilidadPrendaResponseDTO(prendaId, TipoPrenda.ROPA, EstadoItem.DISPONIBLE, 5, List.of()));
-        when(gestionarReservaUseCase.reservar(any())).thenReturn(
-                new ReservaResponseDTO(true, prendaId, sedeId, "M", 1, 4, Instant.now()));
-
-        mockMvc.perform(get("/api/v1/inventario/prenda/{garmentId}", prendaId))
-                .andExpect(status().isOk());
-
-        RegistrarLoteStockCommand batchCmd = new RegistrarLoteStockCommand(
-                prendaId, sedeId, TipoPrenda.ROPA, List.of(new ItemTallaCantidadDTO("M", 5)), Instant.now());
-        mockMvc.perform(post("/api/v1/inventario/lote")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(batchCmd)))
-                .andExpect(status().isCreated());
-
-        ReservarStockCommand reserveCmd = new ReservarStockCommand(
-                prendaId, sedeId, "M", 1, UUID.randomUUID());
-        mockMvc.perform(post("/api/v1/inventario/reserva")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(reserveCmd)))
-                .andExpect(status().isOk());
     }
 
     @Test

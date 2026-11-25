@@ -9,6 +9,6 @@ import java.util.UUID;
 @FeignClient(name = "item-catalogo", url = "${clients.item-catalogo.url}")
 public interface ItemCatalogoFeignClient {
 
-    @GetMapping("/api/v1/prendas/{id}")
+    @GetMapping("/api/v1/garments/{id}")
     PrendaCatalogoDto obtenerPrenda(@PathVariable("id") UUID id);
 }
