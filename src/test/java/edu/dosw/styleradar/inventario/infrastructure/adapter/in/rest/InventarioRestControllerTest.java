@@ -84,7 +84,7 @@ class InventarioRestControllerTest {
     private FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase;
 
     @Test
-    @DisplayName("GET /api/v1/inventory/garment/{garmentId} retorna 200 con desglose")
+    @DisplayName("GET /api/v1/inventory/garments/{garmentId} retorna 200 con desglose")
     void consultarPrendaExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         DisponibilidadPrendaResponseDTO response = new DisponibilidadPrendaResponseDTO(
@@ -94,14 +94,14 @@ class InventarioRestControllerTest {
 
         when(consultarStockUseCase.consultarPorPrenda(prendaId)).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/inventory/garment/{garmentId}", prendaId))
+        mockMvc.perform(get("/api/v1/inventory/garments/{garmentId}", prendaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.prendaId").value(prendaId.toString()))
                 .andExpect(jsonPath("$.stockDisponibleTotal").value(10));
     }
 
     @Test
-    @DisplayName("GET /api/v1/inventory/garment/{garmentId}/availability retorna verificación para catálogo (RES-8)")
+    @DisplayName("GET /api/v1/inventory/garments/{garmentId}/availability retorna verificación para catálogo (RES-8)")
     void verificarDisponibilidadExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         VerificacionDisponibilidadDTO response = new VerificacionDisponibilidadDTO(
@@ -109,7 +109,7 @@ class InventarioRestControllerTest {
 
         when(consultarStockUseCase.verificarDisponibilidad(prendaId)).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/inventory/garment/{garmentId}/availability", prendaId))
+        mockMvc.perform(get("/api/v1/inventory/garments/{garmentId}/availability", prendaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.prendaId").value(prendaId.toString()))
                 .andExpect(jsonPath("$.disponibleParaVenta").value(false))
@@ -301,7 +301,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /api/v1/inventory/garment/{garmentId}/branches/{branchId}/sizes/{size} modifica disponibilidad (RES-7)")
+    @DisplayName("PATCH /api/v1/inventory/garments/{garmentId}/branches/{branchId}/sizes/{size} modifica disponibilidad (RES-7)")
     void actualizarDisponibilidadTallaExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         UUID sedeId = UUID.randomUUID();
@@ -314,7 +314,7 @@ class InventarioRestControllerTest {
         when(ajustarStockUseCase.actualizarPorPrendaYSede(eq(prendaId), eq(sedeId), eq("M"), eq(20)))
                 .thenReturn(response);
 
-        mockMvc.perform(patch("/api/v1/inventory/garment/{garmentId}/branches/{branchId}/sizes/{size}",
+        mockMvc.perform(patch("/api/v1/inventory/garments/{garmentId}/branches/{branchId}/sizes/{size}",
                         prendaId, sedeId, "M")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

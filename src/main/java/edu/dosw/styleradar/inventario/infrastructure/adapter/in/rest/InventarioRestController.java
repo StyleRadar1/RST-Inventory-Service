@@ -78,9 +78,9 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "404", description = "Garment not found in inventory (INVENTARIO_NO_ENCONTRADO)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventory/garment/{garmentId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventory/garments/{garmentId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
-    @GetMapping({"/garment/{garmentId}", "/prenda/{garmentId}"})
+    @GetMapping({"/garments/{garmentId}", "/prenda/{garmentId}"})
     public ResponseEntity<DisponibilidadPrendaResponseDTO> getByGarmentId(
             @Parameter(description = "Garment UUID identifier", required = true)
             @PathVariable UUID garmentId) {
@@ -98,7 +98,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @GetMapping({"/garment/{garmentId}/availability", "/prenda/{garmentId}/disponibilidad"})
+    @GetMapping({"/garments/{garmentId}/availability", "/prenda/{garmentId}/disponibilidad"})
     public ResponseEntity<VerificacionDisponibilidadDTO> verifyAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
             @PathVariable UUID garmentId) {
@@ -226,7 +226,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PatchMapping({"/garment/{garmentId}/branches/{branchId}/sizes/{size}", "/prenda/{garmentId}/sede/{branchId}/tallas/{size}"})
+    @PatchMapping({"/garments/{garmentId}/branches/{branchId}/sizes/{size}", "/prenda/{garmentId}/sede/{branchId}/tallas/{size}"})
     public ResponseEntity<StockItemResponseDTO> updateSizeAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
             @PathVariable UUID garmentId,
