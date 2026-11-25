@@ -1,9 +1,11 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
+import edu.dosw.styleradar.inventario.domain.exception.AccesoDenegadoException;
 import edu.dosw.styleradar.inventario.domain.exception.CantidadInvalidaException;
 import edu.dosw.styleradar.inventario.domain.exception.CatalogoNoDisponibleException;
 import edu.dosw.styleradar.inventario.domain.exception.DomainException;
 import edu.dosw.styleradar.inventario.domain.exception.InventarioSuspendidoException;
+import edu.dosw.styleradar.inventario.domain.exception.NoAutenticadoException;
 import edu.dosw.styleradar.inventario.domain.exception.PrendaDeOtroAlmacenException;
 import edu.dosw.styleradar.inventario.domain.exception.PrendaNoEncontradaEnCatalogoException;
 import edu.dosw.styleradar.inventario.domain.exception.ResourceNotFoundException;
@@ -20,6 +22,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -90,6 +93,16 @@ class GlobalExceptionHandlerTest {
 
         assertCodigoYTimestamp(handler.handlePrendaDeOtroAlmacen(new PrendaDeOtroAlmacenException("Otra sede")),
                 HttpStatus.FORBIDDEN, "PRENDA_DE_OTRO_ALMACEN");
+    }
+
+    @Test
+    void mapeaAccesoDenegadoNoAutenticadoYMetodoNoPermitido() {
+        assertCodigoYTimestamp(handler.handleAccesoDenegado(new AccesoDenegadoException("Prohibido")),
+                HttpStatus.FORBIDDEN, "ACCESO_DENEGADO");
+        assertCodigoYTimestamp(handler.handleNoAutenticado(new NoAutenticadoException("Sin sesión")),
+                HttpStatus.UNAUTHORIZED, "NO_AUTENTICADO");
+        assertCodigoYTimestamp(handler.handleMethodNotAllowed(new HttpRequestMethodNotSupportedException("DELETE")),
+                HttpStatus.METHOD_NOT_ALLOWED, "METODO_NO_PERMITIDO");
     }
 
     @Test

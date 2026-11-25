@@ -22,5 +22,7 @@ public interface StockRepositoryPort {
 
     List<StockItem> buscarPrendasDisponiblesPorTalla(String talla, UUID sedeId);
 
+    List<StockItem> listar(UUID sedeId, int page, int size);
+
     StockItem guardar(StockItem stockItem);
 }

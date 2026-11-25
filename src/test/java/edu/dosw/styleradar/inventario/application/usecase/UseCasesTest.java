@@ -227,6 +227,11 @@ class UseCasesTest {
         List<UUID> disponibles = useCase.listarPrendasDisponiblesPorSede(sedeId);
         assertThat(disponibles).contains(prendaId);
 
+        when(stockRepository.listar(sedeId, 0, 20)).thenReturn(List.of(item));
+        List<StockItemResponseDTO> listado = useCase.listarInventario(sedeId, 0, 20);
+        assertThat(listado).hasSize(1);
+        assertThat(listado.getFirst().talla()).isEqualTo("M");
+
         UUID otraPrenda = UUID.randomUUID();
         when(stockRepository.buscarPorPrenda(otraPrenda)).thenReturn(List.of());
         assertThatThrownBy(() -> useCase.consultarPorPrenda(otraPrenda))

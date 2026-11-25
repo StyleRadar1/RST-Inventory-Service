@@ -10,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
@@ -70,6 +71,21 @@ class SuscripcionEventListenerTest {
 
         verify(useCase, never()).suspenderPorSede(any());
         verify(eventoProcesadoPort, never()).registrarProcesado(any(), any());
+    }
+
+    @Test
+    @DisplayName("Deriva sedeId determinístico desde nit o storeNit cuando no viene UUID")
+    void procesaNitComoFallbackDeSede() {
+        String nit = "900555777-1";
+        UUID esperado = UUID.nameUUIDFromBytes(("ms-tiendas:almacen:" + nit).getBytes(StandardCharsets.UTF_8));
+        when(eventoProcesadoPort.yaFueProcesado("evt-nit-1")).thenReturn(false);
+
+        listener.onSuscripcionSuspendida(Map.of(
+                "eventoId", "evt-nit-1",
+                "data", Map.of("storeNit", "  " + nit + "  ")));
+
+        verify(useCase).suspenderPorSede(esperado);
+        verify(eventoProcesadoPort).registrarProcesado("evt-nit-1", RabbitMqConfig.ROUTING_KEY_SUSCRIPCION_SUSPENDIDA);
     }
 
     @Test
