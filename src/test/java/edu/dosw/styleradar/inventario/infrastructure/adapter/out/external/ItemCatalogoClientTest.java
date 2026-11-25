@@ -60,7 +60,7 @@ class ItemCatalogoClientTest {
     @DisplayName("Retorna Optional.empty cuando ms-item-catalogo responde 404")
     void retornaVacioEn404() {
         UUID prendaId = UUID.randomUUID();
-        Request req = Request.create(Request.HttpMethod.GET, "/api/v1/prendas/" + prendaId,
+        Request req = Request.create(Request.HttpMethod.GET, "/api/v1/garments/" + prendaId,
                 Map.of(), null, StandardCharsets.UTF_8, null);
         FeignException notFound = FeignException.errorStatus(
                 "ItemCatalogoFeignClient#obtenerPrenda(UUID)",
@@ -75,7 +75,7 @@ class ItemCatalogoClientTest {
     @DisplayName("Lanza CatalogoNoDisponibleException cuando ms-item-catalogo falla o no responde")
     void lanza503EnFalloDeCatalogo() {
         UUID prendaId = UUID.randomUUID();
-        Request req = Request.create(Request.HttpMethod.GET, "/api/v1/prendas/" + prendaId,
+        Request req = Request.create(Request.HttpMethod.GET, "/api/v1/garments/" + prendaId,
                 Map.of(), null, StandardCharsets.UTF_8, null);
         FeignException unavailable = FeignException.errorStatus(
                 "ItemCatalogoFeignClient#obtenerPrenda(UUID)",

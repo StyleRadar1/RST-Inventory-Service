@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api/v1/health", "/health"})
+@RequestMapping("/api/v1/health")
 public class HealthController implements HealthApi {
 
     static final String SERVICE = "ms-inventario";

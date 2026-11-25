@@ -45,7 +45,7 @@ import java.util.UUID;
 
 @Tag(name = "Inventory", description = "Endpoints for multi-branch inventory registration, adjustment, reservations, consultation, and stock filtering")
 @RestController
-@RequestMapping("/api/v1/inventario")
+@RequestMapping("/api/v1/inventory")
 public class InventarioRestController {
 
     private final RegistrarStockUseCase registrarStockUseCase;
@@ -78,13 +78,13 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "404", description = "Garment not found in inventory (INVENTARIO_NO_ENCONTRADO)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventario/prenda/{prendaId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventory/garments/{garmentId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
-    @GetMapping("/prenda/{prendaId}")
+    @GetMapping("/garments/{garmentId}")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> getByGarmentId(
             @Parameter(description = "Garment UUID identifier", required = true)
-            @PathVariable UUID prendaId) {
-        DisponibilidadPrendaResponseDTO response = consultarStockUseCase.consultarPorPrenda(prendaId);
+            @PathVariable UUID garmentId) {
+        DisponibilidadPrendaResponseDTO response = consultarStockUseCase.consultarPorPrenda(garmentId);
         return ResponseEntity.ok(response);
     }
 
@@ -98,11 +98,11 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @GetMapping("/prenda/{prendaId}/disponibilidad")
+    @GetMapping("/garments/{garmentId}/availability")
     public ResponseEntity<VerificacionDisponibilidadDTO> verifyAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
-            @PathVariable UUID prendaId) {
-        VerificacionDisponibilidadDTO response = consultarStockUseCase.verificarDisponibilidad(prendaId);
+            @PathVariable UUID garmentId) {
+        VerificacionDisponibilidadDTO response = consultarStockUseCase.verificarDisponibilidad(garmentId);
         return ResponseEntity.ok(response);
     }
 
@@ -111,11 +111,11 @@ public class InventarioRestController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of available garments returned")
     })
-    @GetMapping("/sedes/{sedeId}/disponibles")
+    @GetMapping("/branches/{branchId}/available")
     public ResponseEntity<List<UUID>> listAvailableGarmentsByBranch(
             @Parameter(description = "Branch UUID identifier", required = true)
-            @PathVariable UUID sedeId) {
-        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId);
+            @PathVariable UUID branchId) {
+        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(branchId);
         return ResponseEntity.ok(disponibles);
     }
 
@@ -125,13 +125,13 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "List of garments available in the selected size",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
-    @GetMapping("/tallas/{talla}/prendas")
+    @GetMapping("/sizes/{size}/garments")
     public ResponseEntity<List<UUID>> filterGarmentsBySize(
             @Parameter(description = "Typified size to query (e.g., 'M', 'L', '40')", required = true)
-            @PathVariable String talla,
+            @PathVariable String size,
             @Parameter(description = "Optional physical branch UUID identifier to narrow down the geographic filter")
-            @RequestParam(required = false) UUID sedeId) {
-        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(talla, sedeId);
+            @RequestParam(required = false) UUID branchId) {
+        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(size, branchId);
         return ResponseEntity.ok(prendas);
     }
 
@@ -167,17 +167,17 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "403", description = "Inventory suspended (INVENTARIO_SUSPENDIDO) or garment belongs to another store (PRENDA_DE_OTRO_ALMACEN)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Prenda no pertenece a la sede\",\"status\":403,\"detail\":\"La prenda ... no pertenece al almacén de la sede ...\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"PRENDA_DE_OTRO_ALMACEN\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Prenda no pertenece a la sede\",\"status\":403,\"detail\":\"La prenda ... no pertenece al almacén de la sede ...\",\"instance\":\"/api/v1/inventory/batch\",\"code\":\"PRENDA_DE_OTRO_ALMACEN\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
             @ApiResponse(responseCode = "404", description = "Garment does not exist in ms-item-catalogo (PRENDA_NO_ENCONTRADA)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"La prenda ... no existe en ms-item-catalogo\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"PRENDA_NO_ENCONTRADA\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"La prenda ... no existe en ms-item-catalogo\",\"instance\":\"/api/v1/inventory/batch\",\"code\":\"PRENDA_NO_ENCONTRADA\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
             @ApiResponse(responseCode = "503", description = "ms-item-catalogo service unavailable (CATALOGO_NO_DISPONIBLE)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Servicio de catálogo no disponible\",\"status\":503,\"detail\":\"El servicio de catálogo (ms-item-catalogo) no está disponible\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"CATALOGO_NO_DISPONIBLE\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Servicio de catálogo no disponible\",\"status\":503,\"detail\":\"El servicio de catálogo (ms-item-catalogo) no está disponible\",\"instance\":\"/api/v1/inventory/batch\",\"code\":\"CATALOGO_NO_DISPONIBLE\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
-    @PostMapping("/lote")
+    @PostMapping("/batch")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> registerBatch(
             @Valid @RequestBody RegistrarLoteStockCommand command) {
         DisponibilidadPrendaResponseDTO response = registrarLoteStockUseCase.registrarLote(command);
@@ -197,7 +197,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PutMapping("/{id}/ajuste")
+    @PutMapping("/{id}/adjustment")
     public ResponseEntity<StockItemResponseDTO> adjustStock(
             @Parameter(description = "StockItem UUID identifier", required = true)
             @PathVariable UUID id,
@@ -223,17 +223,17 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PatchMapping("/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}")
+    @PatchMapping("/garments/{garmentId}/branches/{branchId}/sizes/{size}")
     public ResponseEntity<StockItemResponseDTO> updateSizeAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
-            @PathVariable UUID prendaId,
+            @PathVariable UUID garmentId,
             @Parameter(description = "Branch UUID identifier", required = true)
-            @PathVariable UUID sedeId,
+            @PathVariable UUID branchId,
             @Parameter(description = "Typified size to modify", required = true)
-            @PathVariable String talla,
+            @PathVariable String size,
             @Valid @RequestBody ActualizarDisponibilidadDTO request) {
         StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
-                prendaId, sedeId, talla, request.unidades());
+                garmentId, branchId, size, request.unidades());
         return ResponseEntity.ok(response);
     }
 
@@ -253,7 +253,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reserva")
+    @PostMapping("/reservations")
     public ResponseEntity<ReservaResponseDTO> reserveStock(
             @Valid @RequestBody ReservarStockCommand command) {
         ReservaResponseDTO response = gestionarReservaUseCase.reservar(command);
@@ -274,7 +274,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reserva/confirmar")
+    @PostMapping("/reservations/confirm")
     public ResponseEntity<Void> confirmReservation(@Valid @RequestBody ConfirmarReservaCommand command) {
         gestionarReservaUseCase.confirmar(command);
         return ResponseEntity.ok().build();
@@ -291,7 +291,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reserva/liberar")
+    @PostMapping("/reservations/release")
     public ResponseEntity<Void> releaseReservation(@Valid @RequestBody LiberarReservaCommand command) {
         gestionarReservaUseCase.liberar(command);
         return ResponseEntity.ok().build();
