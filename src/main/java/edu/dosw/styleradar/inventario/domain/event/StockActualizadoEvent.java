@@ -6,13 +6,14 @@ import java.util.UUID;
 
 /**
  * Evento disparado cuando se modifican las existencias físicas de una variante.
+ * En la creación inicial de la talla, {@code stockAnterior} es {@code null}.
  */
 public record StockActualizadoEvent(
         UUID eventId,
         UUID prendaId,
         UUID sedeId,
         String talla,
-        int stockAnterior,
+        Integer stockAnterior,
         int stockDisponible,
         int stockReservado,
         Instant ocurridoEn) implements DomainEvent {

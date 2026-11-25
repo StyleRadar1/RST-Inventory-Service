@@ -45,6 +45,7 @@ public class RabbitMqStockEventPublisherAdapter implements StockEventPublisherPo
         Map<String, Object> data = new LinkedHashMap<>();
         if (evento instanceof StockActualizadoEvent e) {
             data.put("prendaId", e.prendaId());
+            data.put("tiendaId", e.sedeId());
             data.put("sedeId", e.sedeId());
             data.put("talla", e.talla());
             data.put("stockAnterior", e.stockAnterior());
