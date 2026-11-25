@@ -6,13 +6,11 @@
 
 ### Equipo y Responsables del Microservicio
 
-Desarrollado y mantenido por el **Equipo `Restrepo`** (prefijo `RST`) para la asignatura **DOSW 2026** dentro del ecosistema **StyleRadar** (`Paquete 2: Catálogo`).
+Desarrollado y mantenido por el **Equipo `Restrepo`** (prefijo `RST`, **Paquete 2: Catálogo**) para la asignatura **DOSW 2026** dentro del ecosistema **StyleRadar**.
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/JUANNICOLASA/Frontend-Style-Radar/main/styleradar-frontend-v3/assets/logo/styleradar-logo.svg" width="260" alt="Logo StyleRadar - Equipo Restrepo" />
-</div>
-
-<div align="center">
+  <img src="https://raw.githubusercontent.com/JUANNICOLASA/Frontend-Style-Radar/main/styleradar-frontend-v3/assets/logo/styleradar-logo.svg" width="240" alt="StyleRadar - Equipo Restrepo" />
+  <br /><br />
 
 | Rol | Nombre Completo | Usuario GitHub |
 | :---: | :--- | :---: |
@@ -22,32 +20,29 @@ Desarrollado y mantenido por el **Equipo `Restrepo`** (prefijo `RST`) para la as
 
 </div>
 
-* **Contacto técnico registrado en OpenAPI:** `daniel.mmartinez@mail.escuelaing.edu.co`
-
 ### Enlaces de Gestión, Repositorios y Evidencias
 
-* **Repositorio GitHub:** [StyleRadar1/RST-Inventory-Service](https://github.com/StyleRadar1/RST-Inventory-Service)
+* **Repositorio GitHub:** [StyleRadar1/RST-Playlist-Service](https://github.com/StyleRadar1/RST-Playlist-Service)
 * **Organización GitHub:** [StyleRadar1](https://github.com/StyleRadar1)
-* **Épica del Microservicio en Jira:** [RES-1 · ms-inventario](https://mail-team-nyjtgqcj.atlassian.net/browse/RES-1)
-* **Tablero Scrum del Equipo en Jira:** [Restrepo-StyleRadar (RES)](https://mail-team-nyjtgqcj.atlassian.net/jira/software/projects/RES/boards/76)
-* **Documento Técnico del Servicio:** [Documento técnico de ms-inventario](../DocumentoTecnicoInventario.html)
-* **Swagger UI (Local):** `http://localhost:8200/api/v1/swagger-ui.html`
-* **Especificación OpenAPI JSON (Local):** `http://localhost:8200/api/v1/v3/api-docs`
+* **Épica del Microservicio en Jira:** `[PENDIENTE: clave y enlace directo de la épica de ms-playlist en el proyecto RES de Jira]`
+* **Tablero Scrum del Equipo:** [Restrepo-StyleRadar (RES)](https://mail-team-nyjtgqcj.atlassian.net/jira/software/projects/RES/boards/76)
+* **Swagger UI (Local):** [http://localhost:8260/api/v1/swagger-ui.html](http://localhost:8260/api/v1/swagger-ui.html)
+* **Especificación OpenAPI JSON (Local):** [http://localhost:8260/api/v1/v3/api-docs](http://localhost:8260/api/v1/v3/api-docs)
 
 <div align="center">
-  <img src="../images/JiraEvidence.png" alt="Evidencia 05 - Tablero Scrum y seguimiento de la épica RES-1 en Jira" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
-  <p><sub><b>Figura 12.1:</b> Tablero Scrum del Equipo Restrepo y seguimiento de la épica <code>RES-1</code> (<code>ms-inventario</code>) en Jira. <i>[PENDIENTE: capturar y guardar <code>docs/images/JiraEvidence.png</code>]</i></sub></p>
+  <img src="../images/JiraEvidence.png" alt="Evidencia 05 - Tablero Scrum y Seguimiento en Jira" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+  <p><sub><b>Figura 12.1:</b> [PENDIENTE: capturar tablero Scrum / épica de ms-playlist en Jira y guardarla en docs/images/JiraEvidence.png]</sub></p>
 </div>
 
 ### Requerimientos Funcionales Asignados
 
 | Código RF | Nombre del Requerimiento | Actor Principal | Criterio de Aceptación Clave |
 | :---: | :--- | :--- | :--- |
-| `SR-RF-10` | Filtrar prendas por talla (`RES-102`) | Comprador (`BUYER`) / `ms-item-catalogo` | Retorna los UUID de prendas activas con unidades disponibles (`> 0`) para la talla consultada y filtro opcional por `branchId`. |
-| `SR-RF-52` | Registrar tallas disponibles de una prenda (`RES-6`) | Administrador de tienda (`TIENDA` / `STORE_ADMIN`) | Valida compatibilidad de tallas (`ROPA`: `XS`–`XXL`, `CALZADO`: `34`–`45`) y verifica existencia/propiedad de la prenda contra `ms-item-catalogo` (`GET /api/v1/garments/{id}`) antes de registrar el lote. |
-| `SR-RF-56` | Actualizar disponibilidad por talla (`RES-7`) | Administrador de tienda (`TIENDA` / `STORE_ADMIN`) | Permite modificar de forma independiente las unidades físicas de una talla (`PUT /{id}/adjustment` o `PATCH .../sizes/{size}`), recalculando estado y emitiendo eventos AMQP. |
-| `SR-RF-57` | Ocultar prenda agotada de los resultados disponibles (`RES-8`) | Comprador / `ms-item-catalogo` | Expone `disponibleParaVenta` (`/availability`) y listado de prendas disponibles por sede (`/branches/{branchId}/available`), además de emitir `styleradar.inventario.stock.agotado` al llegar a `0`. |
-| `SR-RF-50` / `SR-RF-53` / `SR-RF-59` / `SR-RF-60` | Gestión transaccional, reservas y estados derivados *(soporte de dominio)* | Comprador / `ms-pagos` / Sistema | Bloqueo pesimista para reservas, confirmación/liberación (incluso vía RabbitMQ con idempotencia), umbral de últimas unidades (`≤ 3`) y estado `NUEVA_PRENDA` durante `7` días. |
+| **`SR-RF-69`** | Crear playlist de estilo con al menos una prenda aprobada | Comprador (`BUYER`) | `POST /api/v1/playlists` exige mínimo 1 prenda existente y `APROBADA` en `ms-item-catalogo`; retorna `201` y publica `styleradar.playlist.creada`. |
+| **`SR-RF-70`** | Gestionar playlists propias y asociar o retirar prendas | Propietario de playlist (`X-User-Id`) | Solo el creador puede editar (`PUT`), eliminar (`DELETE`) o asociar/retirar prendas en `/garments`; impide duplicados (`422`) y respeta tope de 15 (`RNF-12`). |
+| **`SR-RF-71`** | Consultar playlists e interactuar con Me Gusta y Guardados | Comprador / Visitante | Expone listados públicos, populares paginadas, control de acceso en playlists `PRIVADA` (`403 PLAYLIST_PRIVADA`), consulta propia en `/users/{userId}` y toggles en `/likes` y `/saves`. |
+| **`SR-RF-72`** | Destacar playlists curadas para Home (máximo 3) | Administrador StyleRadar (`STYLERADAR_ADMIN` / `ADMIN_STYLERADAR`) | Solo roles administrativos pueden ejecutar `PUT` / `DELETE /api/v1/playlists/{id}/featured` (`403 ACCESO_DENEGADO` en otro rol); tope máximo de 3 destacadas (`409 LIMITE_DESTACADAS`). |
+| **`RNF-12`** | Límite máximo de 15 prendas por playlist | Sistema (`Playlist`) | Al intentar agregar la prenda 16 al crear o mediante `POST /api/v1/playlists/{id}/garments`, responde `422 LIMITE_PRENDAS_PLAYLIST`. |
 
 ---
 

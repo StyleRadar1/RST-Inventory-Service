@@ -2,262 +2,185 @@
 
 ---
 
-## 2. ARQUITECTURA HEXAGONAL CON SUS DIAGRAMAS
+## 2. ARQUITECTURA HEXAGONAL Y DIAGRAMAS
 
-El servicio implementa **Arquitectura Hexagonal (Puertos y Adaptadores)** con diseño guiado por el dominio (**DDD**). El núcleo (`domain/`) es Java puro sin dependencias de Spring, JPA, RabbitMQ ni OpenFeign; todas las interacciones externas ocurren mediante puertos de entrada (`domain/port/in`) y puertos de salida (`domain/port/out`) implementados por adaptadores intercambiables en `infrastructure/adapter/`.
+El servicio implementa **Arquitectura Hexagonal (Puertos y Adaptadores)** combinada con principios de **Domain-Driven Design (DDD)**. El núcleo de dominio (`Playlist`, `PrendaSnapshot` y reglas invariantes) permanece completamente aislado de Spring Framework, JPA, OpenFeign, RabbitMQ y HTTP, permitiendo evolucionar adaptadores de infraestructura sin alterar la lógica de negocio.
 
 ### Diagramas del Microservicio
 
 #### 2.1 Diagrama de Componentes General
 
 <div align="center">
-  <img src="../uml/diagrama-componentes-general.png" alt="Diagrama de componentes general de StyleRadar" width="100%" />
+  <img src="../uml/DiagramaComponentesGeneral.png" alt="Diagrama de Componentes General de StyleRadar" width="100%" />
+  <p><sub><b>Figura 2.1:</b> [PENDIENTE: agregar archivo docs/uml/DiagramaComponentesGeneral.png en el repositorio]</sub></p>
 </div>
-<p align="center"><sub><i>Nota: Archivo editable en <code>docs/evidencias/DespligueYComponentesGeneral.drawio</code>. Si los PNG residen aún en <code>docs/evidencias/</code>, copiarlos a <code>docs/uml/</code>.</i></sub></p>
 
 ##### Justificación y Explicación Técnica del Diagrama de Componentes General
 
-La vista general representa la arquitectura distribuida de StyleRadar bajo el patrón *API Gateway* y *Database-per-Service*. Las peticiones de clientes ingresan por el Gateway hacia `ms-inventario` (`:8200`), el cual mantiene aislada su propia base de datos PostgreSQL (`inventario_db`), se comunica de manera síncrona saliente con `ms-item-catalogo` (`:8220`) vía OpenFeign para validar prendas al registrar lotes, e intercambia eventos de dominio de forma asíncrona con `ms-item-catalogo`, `ms-pagos`, `ms-notifications` y `ms-estadisticas` a través del broker RabbitMQ (`styleradar.exchange`).
+* **Puerta de entrada y enrutamiento:** Todas las peticiones externas ingresan por el **API Gateway**, que autentica el JWT y propaga hacia `ms-playlist` (`:8260/api/v1`) las cabeceras `X-User-Id`, `X-User-Role` y `X-User-Roles`.
+* **Comunicación síncrona saliente:** Al crear una playlist o asociar una prenda, `ms-playlist` consulta vía REST/OpenFeign (`GET /api/v1/garments/{id}`) a `ms-item-catalogo` (`:8220`) para verificar existencia, nombre oficial y estado `APROBADA`.
+* **Aislamiento de persistencia y caché:** `ms-playlist` persiste exclusivamente en su base dedicada `PostgreSQL 16` (`styleradar_playlist`), respetando *Database-per-Service*. No requiere servidor de caché externo.
+* **Mensajería asíncrona:** A través de RabbitMQ (`styleradar.exchange`), `ms-playlist` consume eventos de retiro de prendas desde `ms-item-catalogo` y publica eventos de creación, asociación de prenda y destacado hacia consumidores interesados como `ms-estadisticas` (`:8420`).
 
 #### 2.2 Diagrama de Componentes Específico
 
 <div align="center">
-  <img src="../uml/DiagramaComponentesInventario.png" alt="Diagrama de componentes específico de ms-inventario" width="100%" />
+  <img src="../uml/DiagramaComponentesPlaylist.png" alt="Diagrama de Componentes Específico de ms-playlist" width="100%" />
+  <p><sub><b>Figura 2.2:</b> [PENDIENTE: agregar archivo docs/uml/DiagramaComponentesPlaylist.png en el repositorio]</sub></p>
 </div>
-<p align="center"><sub><i>Nota: Archivo editable en <code>docs/evidencias/DiagramaComponentesInventario.drawio</code>.</i></sub></p>
 
 ##### Justificación y Explicación Técnica del Diagrama de Componentes Específico
 
-* **Adaptadores de Entrada (`infrastructure/adapter/in/`):** `InventarioRestController` y `HealthController` exponen la API REST bajo `/api/v1/inventory` y `/api/v1/health`, mientras que `OrdenPagoEventListener` y `SuscripcionEventListener` consumen mensajes JSON desde RabbitMQ asegurando idempotencia. Todos invocan exclusivamente interfaces en `domain/port/in/`.
-* **Capa de Aplicación (`application/`):** Los seis servicios `*UseCaseImpl` orquestan transacciones (`@Transactional`), obtienen agregados vía puertos, coordinan `StockItemDtoMapper` (MapStruct) y despachan los eventos de dominio acumulados en `StockItem.pullDomainEvents()`.
-* **Adaptadores de Salida (`infrastructure/adapter/out/`):** `PostgreSqlStockRepositoryAdapter` y `PostgreSqlEventoProcesadoAdapter` persisten en PostgreSQL mediante Spring Data JPA y `StockItemEntityMapper`; `RabbitMqStockEventPublisherAdapter` publica eventos hacia `styleradar.exchange` capturando `AmqpException` para no degradar operaciones si el broker cae temporalmente; y `ItemCatalogoClient` encapsula `ItemCatalogoFeignClient` (`GET /api/v1/garments/{id}`).
-
-```mermaid
-flowchart TD
-    GW["API Gateway"]
-    BRK["RabbitMQ (styleradar.exchange)"]
-    CAT["ms-item-catalogo (:8220)"]
-
-    subgraph INFRA_IN["Infraestructura de Entrada (Driving Adapters)"]
-        REST["InventarioRestController · HealthController"]
-        AMQP_IN["OrdenPagoEventListener · SuscripcionEventListener"]
-    end
-
-    subgraph APP["Capa de Aplicación"]
-        IN_PORT["Puertos de Entrada (6 UseCases)"]
-        USE_CASES["Implementaciones UseCaseImpl"]
-        OUT_PORT["Puertos de Salida (4 Ports)"]
-    end
-
-    subgraph DOMAIN["Núcleo de Dominio"]
-        ENTITIES["StockItem · InventarioVariante · Cantidad · Talla"]
-        EVENTS["StockActualizado · StockAgotado · StockBajo"]
-        EXCEPTIONS["DomainException · CodigoError"]
-    end
-
-    subgraph INFRA_OUT["Infraestructura de Salida (Driven Adapters)"]
-        JPA_REPO["PostgreSqlStockRepositoryAdapter · EventoProcesadoAdapter"]
-        RABBIT_PUB["RabbitMqStockEventPublisherAdapter"]
-        FEIGN_CAT["ItemCatalogoClient (OpenFeign)"]
-    end
-
-    DB[("PostgreSQL 16 (inventario_db)")]
-
-    GW --> REST
-    BRK --> AMQP_IN
-    REST --> IN_PORT
-    AMQP_IN --> IN_PORT
-    IN_PORT --> USE_CASES
-    USE_CASES --> DOMAIN
-    USE_CASES --> OUT_PORT
-    OUT_PORT --> JPA_REPO
-    OUT_PORT --> RABBIT_PUB
-    OUT_PORT --> FEIGN_CAT
-    JPA_REPO --> DB
-    RABBIT_PUB --> BRK
-    FEIGN_CAT --> CAT
-
-    classDef domain fill:#EDE7FF,stroke:#5600EF,stroke-width:2px,color:#0C0C12;
-    classDef app fill:#F8FAFC,stroke:#C4B5FD,stroke-width:2px,color:#0C0C12;
-    classDef infra fill:#12063A,stroke:#5600EF,stroke-width:1.5px,color:#FFFFFF;
-
-    class DOMAIN,ENTITIES,EVENTS,EXCEPTIONS domain;
-    class APP,IN_PORT,USE_CASES,OUT_PORT app;
-    class INFRA_IN,INFRA_OUT,REST,AMQP_IN,JPA_REPO,RABBIT_PUB,FEIGN_CAT infra;
-```
+* **Adaptadores de Entrada (*Driving Adapters*):** `PlaylistController` (documentado mediante `PlaylistApi`), `HealthController` (`HealthApi`), `GlobalExceptionHandler` (respuestas RFC 7807) y `CatalogoEventsConsumer` (listener AMQP sobre la cola `styleradar.playlist.prenda-retirada.q`).
+* **Puertos de Entrada y Capa de Aplicación:** Cinco interfaces de caso de uso (`CrearPlaylistUseCase`, `ConsultarPlaylistUseCase`, `DestacarPlaylistUseCase`, `AsociarPrendaUseCase`, `InteractuarPlaylistUseCase`) con sus implementaciones `@Service` transaccionales (`*Impl`) y `PlaylistDtoMapper` (MapStruct).
+* **Núcleo de Dominio:** Entidades e invariantes en `Playlist` y `PrendaSnapshot` con cero dependencias de infraestructura.
+* **Puertos y Adaptadores de Salida (*Driven Adapters*):** `PlaylistRepositoryPort` implementado por `PostgreSQLPlaylistRepositoryAdapter` + `SpringDataPlaylistRepository` + `PlaylistEntityMapper`; `ItemCatalogoPort` implementado por `ItemCatalogoClient` + `ItemCatalogoFeignClient`; y `PlaylistEventPublisherPort` implementado por `RabbitMQEventPublisher`.
 
 #### 2.3 Diagrama de Clases del Modelo de Dominio
 
 <div align="center">
-  <img src="../uml/DiagramaClasesInventario.png" alt="Diagrama de clases del dominio de ms-inventario" width="100%" />
+  <img src="../uml/DiagramaClasesPlaylist.png" alt="Diagrama de Clases del Modelo de Dominio de ms-playlist" width="100%" />
+  <p><sub><b>Figura 2.3:</b> [PENDIENTE: agregar archivo docs/uml/DiagramaClasesPlaylist.png en el repositorio]</sub></p>
 </div>
-<p align="center"><sub><i>Nota: Archivo editable en <code>docs/evidencias/DiagramaClasesInventario.drawio</code>.</i></sub></p>
 
-##### Justificación y Explicación Técnica del Diagrama de Clases del Dominio
+##### Justificación y Explicación Técnica del Modelo de Dominio
 
-* **Agregado Raíz `StockItem`:** Modela el inventario de una pareja única `(prendaId, sedeId)` con su `TipoPrenda` (`ROPA` o `CALZADO`), `fechaPublicacion`, `umbralUltimasUnidades` (`3` por defecto), bandera `activo` y mapa de variantes por talla (`InventarioVariante`).
-* **Value Objects e Invariantes:** `Cantidad` (Java `record`) impide valores negativos; `Talla` es una `sealed interface` de Java 21 implementada únicamente por `TallaRopa` (`XS`–`XXL`) y `TallaCalzado` (`34`–`45`), garantizando compatibilidad estricta en tiempo de ejecución (`TallaInvalidaException`).
-* **Comportamiento y Eventos:** `StockItem` encapsula `registrarTalla`, `registrarTallasLote`, `actualizarStockFisico`, `reservarStock`, `confirmarVenta`, `liberarReserva`, `descontarStock`, `eliminarTalla` (prohibida si tiene unidades), `suspenderPorMora`, `reactivarSuscripcion` y `calcularEstado` (`SUSPENDIDO`, `AGOTADA`, `ULTIMAS_UNIDADES`, `NUEVA_PRENDA`, `DISPONIBLE`). Cada mutación de unidades registra eventos de dominio (`StockActualizadoEvent`, `StockAgotadoEvent`, `StockBajoEvent`). Las excepciones heredan de `DomainException` y portan un `CodigoError` estandarizado.
+* **Agregado Raíz (`Playlist`):** Centraliza todas las invariantes de negocio: `MAX_PRENDAS = 15` (`RNF-12`), `MAX_DESTACADAS = 3` (`SR-RF-72`), nombre obligatorio (1–100 caracteres), descripción opcional (máx. 300 caracteres), creación obligatoria con mínimo una prenda (`crearConPrendas`), prevención de prendas duplicadas, validación de propietario (`validarPropietario`), control de privacidad en lectura (`validarAccesoLectura`) y alternancia idempotente de `likesUsuarios` y `guardadosUsuarios`.
+* **Entidad / Snapshot Embebido (`PrendaSnapshot`):** Guarda el identificador inmutable `prendaId`, `nombrePrenda`, `fechaAsociacion` y el indicador `disponible` con transiciones explícitas (`marcarNoDisponible()`, `marcarDisponible()`). Incluye la anotación `@Default` para reconstrucción limpia mediante MapStruct.
+* **Enumeraciones:** `VisibilidadPlaylist` (`PUBLICA`, `PRIVADA`) y `Estilo` (`CASUAL`, `FORMAL`, `DEPORTIVO`, `URBANO`).
+* **Jerarquía de Excepciones de Dominio:** `DomainException` encapsula el enum estandarizado `CodigoError` y se especializa en `NoAutorizadoException`, `AccesoDenegadoPlaylistException`, `PlaylistPrivadaException`, `PlaylistSinPrendasException`, `DescripcionMuyLargaException`, `LimitePrendasAlcanzadoException`, `PrendaDuplicadaException`, `PrendaNoEncontradaEnPlaylistException`, `LimiteDestacadasSuperadoException`, `ResourceNotFoundException`, `PrendaNoEncontradaEnCatalogoException`, `PrendaNoAprobadaException` y `CatalogoNoDisponibleException`.
 
 #### 2.4 Diagrama de Base de Datos
 
 <div align="center">
-  <img src="../uml/DiagramaEntidadRelacionInventario.png" alt="Diagrama entidad relación de ms-inventario en PostgreSQL" width="100%" />
+  <img src="../uml/DiagramaEntidadRelacionPlaylist.png" alt="Diagrama Entidad Relación de ms-playlist" width="100%" />
+  <p><sub><b>Figura 2.4:</b> [PENDIENTE: agregar archivo docs/uml/DiagramaEntidadRelacionPlaylist.png en el repositorio]</sub></p>
 </div>
-<p align="center"><sub><i>Nota: Archivo editable en <code>docs/evidencias/DiagramaEntidadRelacionInventario.drawio</code>.</i></sub></p>
 
-##### Justificación y Explicación Técnica del Modelo Relacional
+##### Justificación y Explicación Técnica del Modelo de Datos
 
-El esquema en **PostgreSQL 16** (`inventario_db`, validado con `ddl-auto: validate` y versionado por **Flyway** en `classpath:db/migration`) se compone de tres tablas reales:
-* **`inventario_items` (`StockItemJpaEntity`):** Almacena `id` (PK UUID), `prenda_id`, `sede_id`, `tipo_prenda`, `estado`, `umbral_ultimas_unidades`, `activo`, `fecha_publicacion` y `fecha_actualizacion`, con restricción única `uk_inventario_prenda_sede` sobre `(prenda_id, sede_id)`.
-* **`inventario_tallas` (`InventarioVarianteJpaEntity`):** Relación `1:N` hacia `inventario_items` (`inventario_item_id` FK), guarda `id` (UUID determinístico generado por `stockItemId:talla`), `talla` (hasta 10 caracteres), `unidades_disponibles` y `unidades_reservadas`, con restricción única `uk_inventario_item_talla` sobre `(inventario_item_id, talla)`.
-* **`eventos_procesados` (`EventoProcesadoJpaEntity`):** Tabla de idempotencia AMQP con llave primaria `event_id`, `event_type` y `procesado_en` para garantizar procesamiento *at-most-once* de eventos de pago y suscripción.
-* **Bloqueo transaccional y privacidad:** Las operaciones de reserva usan `LockModeType.PESSIMISTIC_WRITE` (`buscarPorPrendaYSedeConBloqueo`) para prevenir condiciones de carrera sobre stock concurrente. Bajo *Database-per-Service*, no se almacenan datos personales de compradores.
+* **Motor y control de esquema:** Se utiliza `PostgreSQL 16` con migraciones versionadas en `Flyway` (`classpath:db/migration`) y validación estricta de esquema por Hibernate (`ddl-auto: validate`, `open-in-view: false`).
+* **Tablas reales y cardinalidades:**
+  * `playlists`: clave primaria `id` (`UUID`), `usuario_id` (`VARCHAR(100)`, no nulo), `nombre` (`VARCHAR(100)`, no nulo), `descripcion` (`VARCHAR(300)`), `visibilidad` (`VARCHAR(20)`), `estilo` (`VARCHAR(30)`), `destacada` (`BOOLEAN`), `fecha_creacion` (`TIMESTAMP`, inmutable) y `fecha_actualizacion` (`TIMESTAMP`).
+  * `playlist_prendas` (`1:N` vía `@ElementCollection` sobre `PrendaEmbeddable`): `playlist_id` (FK a `playlists`), `prenda_id` (`UUID`), `nombre_prenda` (`VARCHAR(150)`), `fecha_asociacion` (`TIMESTAMP`) y `disponible` (`BOOLEAN`).
+  * `playlist_likes` (`1:N` vía `@ElementCollection`): `playlist_id` y `usuario_id` (`VARCHAR(100)`).
+  * `playlist_guardados` (`1:N` vía `@ElementCollection`): `playlist_id` y `usuario_id` (`VARCHAR(100)`).
+* **Privacidad y cumplimiento:** Siguiendo *Database-per-Service* y minimización de datos, `ms-playlist` únicamente almacena el identificador opaco `usuario_id` y la referencia `prenda_id` con su snapshot de nombre; no almacena correos, nombres reales, teléfonos ni contraseñas.
 
 #### 2.5 Diagrama de Despliegue General
 
 <div align="center">
-  <img src="../uml/diagrama-despliegue-general.png" alt="Diagrama de despliegue general de StyleRadar" width="100%" />
+  <img src="../uml/DiagramaDespliegueGeneral.png" alt="Diagrama de Despliegue General de StyleRadar" width="100%" />
+  <p><sub><b>Figura 2.5:</b> [PENDIENTE: agregar archivo docs/uml/DiagramaDespliegueGeneral.png en el repositorio]</sub></p>
 </div>
-<p align="center"><sub><i>Nota: Archivo editable en <code>docs/evidencias/DespligueYComponentesGeneral.drawio</code>.</i></sub></p>
 
-##### Justificación y Explicación Técnica de la Topología de Despliegue
+##### Justificación y Explicación Técnica del Despliegue
 
-El servicio corre en un contenedor OCI Java 21 exponiendo el puerto **`8200`** detrás de **Azure Container Apps** (entornos **QA** desde `develop` y **PROD** desde `master`), con `server.forward-headers-strategy: framework` y `ForwardedHeaderFilter` habilitado para procesar cabeceras `X-Forwarded-*` del *Ingress*. En local se levanta mediante `docker-compose.yml` junto a `postgres:16-alpine` y `rabbitmq:3.13.7-management-alpine`. En nube se conecta al PostgreSQL compartido con pool HikariCP restringido (`maximum-pool-size: 3`, `minimum-idle: 1`), a RabbitMQ sobre TLS (`:5671`), y por HTTP hacia `ms-item-catalogo` (`ITEM_CATALOGO_URL`, timeouts `5s`/`15s`).
+* **Capa Cliente e Ingress:** El tráfico entra por el API Gateway hacia los contenedores de **Azure Container Apps** en QA y PROD (con escalado a cero por inactividad, lo que introduce arranque en frío en la primera petición).
+* **Topología específica de `ms-playlist`:** El contenedor escucha en el puerto `8260` (`/api/v1`), se comunica vía HTTPS por OpenFeign con el contenedor de `ms-item-catalogo` (`ITEM_CATALOGO_URL`), persiste en el servidor **PostgreSQL 16** compartido con un pool acotado de HikariCP (`maximum-pool-size: 3`, `minimum-idle: 1`) para evitar agotamiento de conexiones, y se conecta en QA a RabbitMQ por puerto TLS `5671` (en entornos como PROD sin RabbitMQ activo, `RabbitMQEventPublisher` captura `AmqpException` para no degradar la API REST).
 
 #### 2.6 Diagrama de Secuencia de Flujos Críticos
 
 <div align="center">
-  <img src="../uml/diagrama-secuencia-registrar-stock.png" alt="Diagrama de secuencia registrar stock" width="100%" />
+  <img src="../uml/DiagramaSecuenciaPlaylist.png" alt="Diagrama de Secuencia de Flujos Críticos de ms-playlist" width="100%" />
+  <p><sub><b>Figura 2.6:</b> [PENDIENTE: agregar archivo docs/uml/DiagramaSecuenciaPlaylist.png en el repositorio]</sub></p>
 </div>
-
-<div align="center">
-  <img src="../uml/diagrama-secuencia-reservar-stock.png" alt="Diagrama de secuencia reservar stock" width="100%" />
-</div>
-
-<p align="center"><sub><i>Nota: Archivos editables en <code>docs/evidencias/</code>. [PENDIENTE: agregar un tercer diagrama de secuencia específico para el flujo de consulta/disponibilidad o manejo de excepciones si se requiere en gráfico independiente.]</i></sub></p>
 
 ##### Justificación y Explicación Técnica de los Flujos Críticos
 
-1. **Escenario 1 · Registrar stock por lote (`POST /api/v1/inventory/batch`, `SR-RF-52`):**
-   Spring valida `RegistrarLoteStockCommand` (`400 DATOS_INVALIDOS` si faltan campos). `RegistrarLoteStockUseCaseImpl` invoca a `ItemCatalogoClient` (`GET /api/v1/garments/{id}`): si catálogo devuelve `404`, responde `404 PRENDA_NO_ENCONTRADA`; si catálogo no responde o falla, `503 CATALOGO_NO_DISPONIBLE`; si `almacenId` no coincide con `sedeId`, `403 PRENDA_DE_OTRO_ALMACEN`. Luego interpreta cada talla según `TipoPrenda`, crea o actualiza el agregado `StockItem`, persiste en PostgreSQL, publica `StockActualizadoEvent` (y `StockBajoEvent`/`StockAgotadoEvent` si aplica) en RabbitMQ y retorna `201 Created` con `DisponibilidadPrendaResponseDTO`.
-2. **Escenario 2 · Reservar stock con bloqueo pesimista (`POST /api/v1/inventory/reservations`, `SR-RF-53`):**
-   `GestionarReservaUseCaseImpl` consulta `buscarPorPrendaYSedeConBloqueo` (`PESSIMISTIC_WRITE`, lanzando `404 INVENTARIO_NO_ENCONTRADO` si no existe). Si la sede está suspendida lanza `403 INVENTARIO_SUSPENDIDO`; si no alcanzan las unidades disponibles en esa talla lanza `409 STOCK_INSUFICIENTE`. En caso válido, descuenta de `stockDisponible`, suma a `stockReservado`, persiste, publica eventos en RabbitMQ y responde `200 OK` con `expiracionReserva` (+15 minutos).
-3. **Escenario 3 · Manejo centralizado de excepciones (RFC 7807):**
-   `GlobalExceptionHandler` (`@RestControllerAdvice`) intercepta tanto excepciones de dominio (`DomainException`) como errores de deserialización, tipo de parámetro, rutas inexistentes (`NoResourceFoundException` $\rightarrow$ `404 RUTA_NO_ENCONTRADA`) y Bean Validation (`400 DATOS_INVALIDOS` con mapa `errors`), devolviendo siempre `ProblemDetail` (`application/problem+json`) con propiedades estándar `code` y `timestamp`.
+1. **Flujo principal — Creación de playlist (`POST /api/v1/playlists`):** `PlaylistController` valida `X-User-Id` y el DTO `@Valid` (`CrearPlaylistRequest`). `CrearPlaylistUseCaseImpl` exige al menos 1 `prendaId` y máximo 15; por cada UUID consulta `ItemCatalogoClient` &rarr; `GET /api/v1/garments/{id}` en `ms-item-catalogo`. Si alguna no existe lanza `404 PRENDA_NO_ENCONTRADA`; si no está `APROBADA` lanza `422 PRENDA_NO_APROBADA`; si catálogo falla lanza `503 CATALOGO_NO_DISPONIBLE`. Con todas aprobadas, construye el agregado `Playlist`, guarda en PostgreSQL y publica `styleradar.playlist.creada` más `styleradar.playlist.prenda.asociada` por cada prenda, retornando `201 Created`.
+2. **Flujo administrativo — Destacar playlist (`PUT /api/v1/playlists/{id}/featured`):** `PlaylistController` valida `X-User-Id` (`401` si falta) y verifica en `X-User-Role` / `X-User-Roles` que el usuario posea `STYLERADAR_ADMIN` o `ADMIN_STYLERADAR` (`403 ACCESO_DENEGADO` en otro caso). `DestacarPlaylistUseCaseImpl` consulta `countDestacadas()` en PostgreSQL; si ya existen 3 lanza `409 LIMITE_DESTACADAS`. De lo contrario marca `destacada = true`, guarda y publica `styleradar.playlist.destacada.actualizada`.
+3. **Flujo transversal — Manejo centralizado de errores RFC 7807:** Toda excepción de validación (`MethodArgumentNotValidException`), de parámetros (`MethodArgumentTypeMismatchException`), de autorización o de dominio (`DomainException`) es interceptada por `GlobalExceptionHandler` (`@RestControllerAdvice`), devolviendo `application/problem+json` con `status`, `title`, `detail`, `code` (UPPER_SNAKE_CASE) y `timestamp` (ISO-8601).
 
-### Estructura Oficial de Paquetes en `src/main/java/edu/dosw/styleradar/inventario/`
+### Estructura Oficial de Paquetes en `src/main/java/edu/dosw/styleradar/playlist/`
 
 ```text
-src/main/java/edu/dosw/styleradar/inventario/
-├── InventoryServiceApplication.java
+src/main/java/edu/dosw/styleradar/playlist/
+├── PlaylistServiceApplication.java
 ├── domain/
 │   ├── model/
-│   │   ├── EstadoItem.java
-│   │   ├── InventarioVariante.java
-│   │   ├── StockItem.java
-│   │   └── TipoPrenda.java
-│   ├── valueobject/
-│   │   ├── Cantidad.java
-│   │   ├── Talla.java
-│   │   ├── TallaCalzado.java
-│   │   └── TallaRopa.java
-│   ├── event/
-│   │   ├── DomainEvent.java
-│   │   ├── StockActualizadoEvent.java
-│   │   ├── StockAgotadoEvent.java
-│   │   └── StockBajoEvent.java
+│   │   ├── Default.java
+│   │   ├── Estilo.java
+│   │   ├── Playlist.java
+│   │   ├── PrendaSnapshot.java
+│   │   └── VisibilidadPlaylist.java
 │   ├── exception/
-│   │   ├── CantidadInvalidaException.java
+│   │   ├── AccesoDenegadoPlaylistException.java
 │   │   ├── CatalogoNoDisponibleException.java
 │   │   ├── CodigoError.java
+│   │   ├── DescripcionMuyLargaException.java
 │   │   ├── DomainException.java
-│   │   ├── InventarioSuspendidoException.java
-│   │   ├── PrendaDeOtroAlmacenException.java
+│   │   ├── LimiteDestacadasSuperadoException.java
+│   │   ├── LimitePrendasAlcanzadoException.java
+│   │   ├── NoAutorizadoException.java
+│   │   ├── PlaylistPrivadaException.java
+│   │   ├── PlaylistSinPrendasException.java
+│   │   ├── PrendaDuplicadaException.java
+│   │   ├── PrendaNoAprobadaException.java
 │   │   ├── PrendaNoEncontradaEnCatalogoException.java
-│   │   ├── ResourceNotFoundException.java
-│   │   ├── StockInsuficienteException.java
-│   │   ├── TallaConUnidadesException.java
-│   │   ├── TallaInvalidaException.java
-│   │   └── TallaNoRegistradaException.java
+│   │   ├── PrendaNoEncontradaEnPlaylistException.java
+│   │   └── ResourceNotFoundException.java
 │   └── port/
 │       ├── in/
-│       │   ├── AjustarStockUseCase.java
-│       │   ├── ConsultarStockUseCase.java
-│       │   ├── FiltrarPrendasPorTallaUseCase.java
-│       │   ├── GestionarReservaUseCase.java
-│       │   ├── RegistrarLoteStockUseCase.java
-│       │   ├── RegistrarStockUseCase.java
-│       │   └── SuspenderInventarioUseCase.java
+│       │   ├── AsociarPrendaUseCase.java
+│       │   ├── ConsultarPlaylistUseCase.java
+│       │   ├── CrearPlaylistUseCase.java
+│       │   ├── DestacarPlaylistUseCase.java
+│       │   └── InteractuarPlaylistUseCase.java
 │       └── out/
-│           ├── EventoProcesadoPort.java
 │           ├── ItemCatalogoPort.java
-│           ├── PrendaCatalogoInfo.java
-│           ├── StockEventPublisherPort.java
-│           └── StockRepositoryPort.java
+│           ├── PlaylistEventPublisherPort.java
+│           ├── PlaylistRepositoryPort.java
+│           └── PrendaCatalogoInfo.java
 ├── application/
-│   ├── usecase/
-│   │   ├── AjustarStockUseCaseImpl.java
-│   │   ├── ConsultarStockUseCaseImpl.java
-│   │   ├── FiltrarPrendasPorTallaUseCaseImpl.java
-│   │   ├── GestionarReservaUseCaseImpl.java
-│   │   ├── RegistrarLoteStockUseCaseImpl.java
-│   │   ├── RegistrarStockUseCaseImpl.java
-│   │   └── SuspenderInventarioUseCaseImpl.java
 │   ├── dto/
-│   │   ├── ActualizarDisponibilidadDTO.java
-│   │   ├── AjustarStockCommand.java
-│   │   ├── ConfirmarReservaCommand.java
-│   │   ├── DisponibilidadPrendaResponseDTO.java
-│   │   ├── ItemTallaCantidadDTO.java
-│   │   ├── LiberarReservaCommand.java
-│   │   ├── RegistrarLoteStockCommand.java
-│   │   ├── RegistrarStockCommand.java
-│   │   ├── ReservaResponseDTO.java
-│   │   ├── ReservarStockCommand.java
-│   │   ├── SedeStockDTO.java
-│   │   ├── StockItemResponseDTO.java
-│   │   ├── VarianteStockDTO.java
-│   │   └── VerificacionDisponibilidadDTO.java
-│   └── mapper/
-│       └── StockItemDtoMapper.java
+│   │   ├── AgregarPrendaRequest.java
+│   │   ├── CrearPlaylistRequest.java
+│   │   ├── EditarPlaylistRequest.java
+│   │   ├── PageResponse.java
+│   │   ├── PlaylistResponse.java
+│   │   ├── PrendaResponse.java
+│   │   └── mapper/
+│   │       └── PlaylistDtoMapper.java
+│   └── usecase/
+│       ├── AsociarPrendaUseCaseImpl.java
+│       ├── ConsultarPlaylistUseCaseImpl.java
+│       ├── CrearPlaylistUseCaseImpl.java
+│       ├── DestacarPlaylistUseCaseImpl.java
+│       └── InteractuarPlaylistUseCaseImpl.java
 └── infrastructure/
     ├── adapter/
     │   ├── in/
-    │   │   ├── rest/
-    │   │   │   ├── GlobalExceptionHandler.java
-    │   │   │   ├── HealthController.java
-    │   │   │   ├── InventarioRestController.java
-    │   │   │   └── doc/
-    │   │   │       └── HealthApi.java
-    │   │   └── amqp/
-    │   │       ├── OrdenPagoEventListener.java
-    │   │       └── SuscripcionEventListener.java
+    │   │   ├── amqp/
+    │   │   │   └── CatalogoEventsConsumer.java
+    │   │   └── rest/
+    │   │       ├── HealthController.java
+    │   │       ├── PlaylistController.java
+    │   │       └── doc/
+    │   │           ├── HealthApi.java
+    │   │           └── PlaylistApi.java
     │   └── out/
-    │       ├── persistence/
-    │       │   ├── PostgreSqlEventoProcesadoAdapter.java
-    │       │   ├── PostgreSqlStockRepositoryAdapter.java
-    │       │   ├── entity/
-    │       │   │   ├── EventoProcesadoJpaEntity.java
-    │       │   │   ├── InventarioVarianteJpaEntity.java
-    │       │   │   └── StockItemJpaEntity.java
-    │       │   ├── mapper/
-    │       │   │   └── StockItemEntityMapper.java
-    │       │   └── repository/
-    │       │       ├── SpringDataEventoProcesadoRepository.java
-    │       │       └── SpringDataStockItemRepository.java
+    │       ├── external/
+    │       │   ├── ItemCatalogoClient.java
+    │       │   ├── ItemCatalogoFeignClient.java
+    │       │   └── PrendaCatalogoDto.java
     │       ├── messaging/
-    │       │   └── RabbitMqStockEventPublisherAdapter.java
-    │       └── external/
-    │           ├── ItemCatalogoClient.java
-    │           ├── ItemCatalogoFeignClient.java
-    │           └── PrendaCatalogoDto.java
-    └── config/
-        ├── BeanConfig.java
-        ├── CorsConfig.java
-        ├── FeignConfig.java
-        ├── OpenApiConfig.java
-        └── RabbitMqConfig.java
+    │       │   └── RabbitMQEventPublisher.java
+    │       └── persistence/
+    │           ├── PostgreSQLPlaylistRepositoryAdapter.java
+    │           ├── SpringDataPlaylistRepository.java
+    │           ├── entity/
+    │           │   ├── PlaylistEntity.java
+    │           │   └── PrendaEmbeddable.java
+    │           └── mapper/
+    │               └── PlaylistEntityMapper.java
+    ├── config/
+    │   ├── BeanConfig.java
+    │   ├── FeignConfig.java
+    │   ├── OpenApiConfig.java
+    │   └── RabbitMqConfig.java
+    └── exception/
+        └── GlobalExceptionHandler.java
 ```
 
 ---

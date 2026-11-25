@@ -4,23 +4,25 @@
 
 ## 5. TECNOLOGÍAS Y DEPENDENCIAS
 
-La arquitectura tecnológica de `ms-inventario` se define en `pom.xml` sobre **Spring Boot 3.3.4** y **Java 21**, garantizando persistencia transaccional con bloqueo pesimista, migraciones reproducibles, integración HTTP declarativa, mensajería resiliente y verificación estricta de calidad en cada build.
+La selección tecnológica de `ms-playlist` está alineada con el estándar del Paquete 2 (Catálogo) de StyleRadar, priorizando tipado fuerte, aislamiento hexagonal, migraciones reproducibles y tolerancia a fallos en red y mensajería.
 
 | Capa / Componente | Tecnología | Versión | Justificación Técnica |
 | :--- | :--- | :--- | :--- |
-| **Lenguaje Core** | Java | `21` (LTS) | Versión *Long-Term Support*; soporta `sealed interface` (`Talla`), `records` (`Cantidad`, DTOs, eventos) y mejoras de rendimiento de la JVM. |
-| **Framework Principal** | Spring Boot (`spring-boot-starter-parent`) | `3.3.4` | Provee el contenedor web embebido, validación (`starter-validation`), JPA (`starter-data-jpa`), mensajería (`starter-amqp`) y observabilidad (`starter-actuator`). |
-| **Cliente HTTP Declarativo** | Spring Cloud (`spring-cloud-starter-openfeign`) | `2023.0.3` | Implementa `ItemCatalogoFeignClient` para validar existencia y propiedad de almacén de prendas en `ms-item-catalogo` (`GET /api/v1/garments/{id}`) con timeouts `5s`/`15s`. |
-| **Base de Datos Relacional** | PostgreSQL (`postgres:16-alpine`) | `16` (driver gestionado por Boot `3.3.4`) | Motor relacional ACID necesario para consistencia en descuentos y reservas concurrentes mediante `LockModeType.PESSIMISTIC_WRITE`. |
-| **Pool de Conexiones** | HikariCP | `Gestionada por Spring Boot 3.3.4` | Limitado a `maximum-pool-size: 3` y `minimum-idle: 1` (`idle-timeout: 60000`) para proteger la instancia compartida de PostgreSQL en QA y PROD. |
-| **Migraciones de Esquema** | Flyway (`flyway-core`, `flyway-database-postgresql`) | `Gestionada por Spring Boot 3.3.4` | Versiona de forma determinística el esquema en `classpath:db/migration` junto con `hibernate.ddl-auto: validate`. |
-| **Mensajería Asíncrona** | RabbitMQ (`rabbitmq:3.13.7-management-alpine` + Spring AMQP) | `3.13.7` | Publica eventos de stock en `styleradar.exchange` y consume eventos de pago y suspensión desde `ms-pagos` con reintentos exponenciales y DLQ (`styleradar.inventario.dlq`). |
-| **Mapeo de DTOs y Entidades** | MapStruct (`mapstruct` + `mapstruct-processor`) | `1.5.5.Final` | Genera en compilación `StockItemDtoMapper` y `StockItemEntityMapper` sin penalización por reflexión. |
-| **Documentación OpenAPI** | `springdoc-openapi-starter-webmvc-ui` | `2.6.0` | Expone la especificación OpenAPI 3 (`/api/v1/v3/api-docs`) y la interfaz Swagger UI (`/api/v1/swagger-ui.html`) con servidores relativos (`/`). |
-| **Pruebas y Entorno Test** | JUnit 5, Mockito, H2 (`test`) y Testcontainers (`postgresql`, `rabbitmq`) | `Gestionada por Spring Boot 3.3.4` | Ejecuta 17 suites unitarias, de slice web (`@WebMvcTest`) y arranque de contexto con Flyway + H2 (`MODE=PostgreSQL`), además de soporte Testcontainers. |
-| **Métricas de Cobertura** | JaCoCo (`jacoco-maven-plugin`) | `0.8.12` | Analiza las 44 clases del bundle `RST-Inventory-Service` y exige un mínimo de `85 %` (`0.85` LINE) en fase `verify`. |
-| **Análisis Estático** | SpotBugs (`spotbugs-maven-plugin`) | `4.8.6.4` | Ejecuta análisis con `effort: Max` y `threshold: High` en fase `verify`, bloqueando errores o advertencias antes de empaquetar. |
-| **Contenerización** | Docker / Docker Compose | `[PENDIENTE: confirmar imagen base en Dockerfile]` | Orquesta localmente el servicio junto con PostgreSQL 16 y RabbitMQ 3.13.7 y genera la imagen OCI desplegable en Azure Container Apps. |
+| **Lenguaje Core** | Java LTS | `21` | Aprovecha *records* para DTOs inmutables (`CrearPlaylistRequest`, `PlaylistResponse`, `PrendaCatalogoDto`), colecciones modernas (`getFirst()`) y soporte LTS en contenedores OCI. |
+| **Framework Principal** | Spring Boot | `[PENDIENTE: confirmar en pom.xml; estándar RST: 3.3.4]` | Provee inyección de dependencias, configuración externalizada (`application.yml`), soporte nativo para RFC 7807 (`ProblemDetail`) y autoconfiguración de datos y mensajería. |
+| **Capa Web y Validación** | Spring Web MVC + Jakarta Validation | Gestionada por Spring Boot | Expone los controladores REST bajo `/api/v1`, deserializa JSON y valida reglas estructurales (`@NotBlank`, `@NotNull`, `@Size`) antes de invocar la capa de aplicación. |
+| **Persistencia ORM** | Spring Data JPA / Hibernate | Gestionada por Spring Boot | Implementa el adaptador PostgreSQL con `@ElementCollection`, carga perezosa controlada dentro de límites `@Transactional` (`open-in-view: false`) y validación estricta de esquema (`ddl-auto: validate`). |
+| **Pool de Conexiones** | HikariCP | Gestionada por Spring Boot | Configurado con `maximum-pool-size: 3` y `minimum-idle: 1` para operar de forma segura sobre el servidor PostgreSQL compartido de QA y PROD. |
+| **Base de Datos** | PostgreSQL | `16` | Garantiza integridad referencial y transacciones ACID sobre playlists, snapshots de prendas, likes y guardados (*Database-per-Service*). |
+| **Migraciones de Esquema** | Flyway | Gestionada por Spring Boot | Versiona de forma determinista el esquema DDL en `classpath:db/migration` antes de iniciar Hibernate. |
+| **Cliente HTTP Declarativo** | Spring Cloud OpenFeign | Gestionada por Spring Cloud (`[PENDIENTE: versión exacta en pom.xml]`) | Desacopla la consulta síncrona a `ms-item-catalogo` (`GET /api/v1/garments/{id}`) con timeouts explícitos (`connect-timeout: 5000`, `read-timeout: 15000`). |
+| **Broker de Mensajería** | RabbitMQ + Spring AMQP | `3.13.7` | Permite publicar eventos de dominio (`styleradar.playlist.creada`, `destacada.actualizada`, `prenda.asociada`) y consumir retiros de prendas (`styleradar.catalogo.prenda.retirada`) con soporte DLQ y TLS (`:5671`). |
+| **Mapeo Objeto-Objeto** | MapStruct | `[PENDIENTE: confirmar en pom.xml; estándar RST: 1.5.5.Final]` | Genera en tiempo de compilación `PlaylistDtoMapper` y `PlaylistEntityMapper` sin reflexión ni penalización en arranque. |
+| **Documentación API** | springdoc-openapi (Swagger UI) | `[PENDIENTE: confirmar en pom.xml; estándar RST: 2.6.0]` | Genera la especificación OpenAPI (`/api/v1/v3/api-docs`) y la interfaz interactiva (`/api/v1/swagger-ui.html`) a partir de `PlaylistApi` y `HealthApi`. |
+| **Observabilidad / Salud** | Spring Boot Actuator + `HealthController` | Gestionada por Spring Boot | Expone `/api/v1/health` y los endpoints de gestión `health` e `info` bajo `/api/v1/actuator`. |
+| **Pruebas Unitarias y Web** | JUnit 5 + Mockito + AssertJ + MockMvc | Gestionada por Spring Boot | Permite probar invariantes de dominio, casos de uso, manejo de errores RFC 7807, clientes Feign y controladores REST sin levantar infraestructura externa. |
+| **Pruebas de Integración** | Testcontainers (`postgres:16-alpine`) | Gestionada por Spring Boot | Levanta una instancia real de PostgreSQL 16 en Docker durante `PlaylistServiceApplicationIntegrationTest` para validar Flyway y JPA end-to-end. |
+| **Cobertura y Análisis Estático** | JaCoCo + SpotBugs | `[PENDIENTE: confirmar versiones en pom.xml; estándar RST: JaCoCo 0.8.12 / SpotBugs 4.8.6.4]` | Verifica la cobertura mínima obligatoria (`≥ 85%`) y detecta defectos estáticos antes de generar la imagen OCI. |
 
 ---
 

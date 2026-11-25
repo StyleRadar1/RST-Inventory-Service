@@ -4,44 +4,45 @@
 
 ## 10. RAMAS Y CÓMO CONTRIBUIR
 
-El flujo de desarrollo en `RST-Inventory-Service` adopta **GitFlow** con ramas protegidas (`master`/`main` para Producción y `develop` para integración continua en QA). Todo cambio se integra exclusivamente mediante **Pull Request** con revisión de pares y pipeline en verde (`test-and-quality` + `docker-dry-run`).
+El repositorio `RST-Playlist-Service` adopta el modelo **GitFlow** acordado por el Equipo Restrepo (`RST`). Las ramas principales **`master`** (Producción) y **`develop`** (Integración / QA) están protegidas: ningún desarrollador hace *push* directo sobre ellas; toda integración ingresa exclusivamente mediante **Pull Request** revisado, con el pipeline en verde y aprobación previa. Para promover cambios desde `develop` hacia `master` se tramita además la solicitud oficial de CMV.
 
 ### Estructura Oficial de Ramas
 
 ```text
-master (main)                       <-- Versiones estables desplegadas en Producción (PROD)
-└── develop                         <-- Integración del equipo y despliegue continuo en QA
-    ├── feature/HU-xx-descripcion   <-- Nuevas funcionalidades por historia de usuario
-    ├── fix/descripcion             <-- Corrección de errores (ej. fix/limitar-pool-hikari)
-    ├── bugfix/descripcion          <-- Correcciones disparadoras de CI por push
-    ├── hotfix/descripcion          <-- Parches urgentes de producción
-    └── refactor/descripcion        <-- Refactorizaciones técnicas (ej. refactor/endpoints-ingles)
+master                                  <-- Versiones estables en Producción (CMV aprobada)
+└── develop                             <-- Integración continua y despliegue automático a QA
+    ├── feature/HU-xx-descripcion       <-- Nuevas funcionalidades o historias de usuario
+    ├── fix/descripcion-corta           <-- Correcciones de defectos, seguridad o configuración
+    ├── refactor/descripcion-corta      <-- Mejoras estructurales / estandarización de API
+    └── docs/descripcion-corta          <-- Actualización de documentación y evidencias
 ```
 
 ### Convención de Commits (*Conventional Commits*)
 
-Todo commit sigue el formato estandarizado en español:
+Todo *commit* debe redactarse siguiendo el formato estándar:
 
 ```text
-<tipo>(<alcance>): <descripción en español>
+<tipo>(<alcance>): <descripción clara en español>
 ```
 
-Tipos más usados: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`.
+Tipos admitidos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`.
 
-**Ejemplos reales del repositorio:**
-* `feat(inventario): validar existencia y sede de prenda contra ms-item-catalogo`
-* `fix(config): limitar pool de conexiones hikari en postgresql`
-* `refactor(api): dejar solo rutas en inglés bajo /api/v1 y actualizar feign a /garments`
-* `docs(readme): estandarizar documentación técnica en 12 secciones`
+**Ejemplos reales del repositorio `ms-playlist`:**
+
+* `fix(db): limitar pool de conexiones hikari a 3 en application.yml`
+* `fix(security): validar rol admin de StyleRadar al destacar playlists`
+* `refactor(api): dejar solo rutas en ingles, actualizar feign a garments y swagger en ingles`
+* `feat(events): publicar evento styleradar.playlist.creada al crear playlist`
 
 ### Checklist Obligatorio para Pull Requests
 
-- [ ] La rama parte de la versión más reciente de `develop`.
-- [ ] Todas las rutas nuevas o modificadas cumplen el estándar oficial: **inglés**, sin `/me` y bajo `/api/v1` (y `/api/v1/health` para salud).
-- [ ] `./mvnw clean verify` finaliza con `BUILD SUCCESS`, cobertura JaCoCo `≥ 85 %` y `0` bugs en SpotBugs.
-- [ ] No se versionan archivos `.env`, contraseñas ni tokens en el código fuente.
-- [ ] Si se agregan propiedades en `application.yml`, eventos RabbitMQ o endpoints, quedan actualizadas las secciones correspondientes en `docs/secciones/`.
-- [ ] El PR cuenta con aprobación de otro integrante del equipo antes del *merge*.
+- [ ] La rama parte de la versión más reciente de `develop` (`git pull origin develop`).
+- [ ] Todos los endpoints nuevos o modificados cumplen el estándar: rutas en inglés bajo `/api/v1`, sin `/me` y sin verbos en la URI.
+- [ ] Todas las pruebas pasan (`./mvnw clean verify`) y la cobertura **JaCoCo** es mayor o igual al **85 %**.
+- [ ] El análisis estático (**SpotBugs**) finaliza sin hallazgos bloqueantes.
+- [ ] No se incluyen credenciales, contraseñas, tokens ni archivos `.env` en el control de versiones.
+- [ ] La documentación Swagger (`PlaylistApi`, `HealthApi`, `OpenApiConfig`) y los archivos de `docs/` reflejan cualquier cambio de contrato REST o AMQP.
+- [ ] El Pull Request cuenta con al menos una aprobación (*Approve*) de otro integrante del equipo antes del *merge*.
 
 ---
 

@@ -4,95 +4,80 @@
 
 ## 4. EVENTOS QUE PUBLICA Y CONSUME
 
-La comunicación asíncrona entre microservicios se realiza a través de **RabbitMQ 3.13.7** sobre el exchange oficial **`styleradar.exchange`** (`TopicExchange`) en formato JSON UTF-8 plano **sin cabecera `__TypeId__`**. Los mensajes que fallan durante el procesamiento se reintentan hasta `3` veces con *backoff* exponencial (`1000 ms`, multiplicador `2.0`, máximo `10000 ms`); las excepciones fatales de conversión o resolución (`MessageConversionException`, `AmqpRejectAndDontRequeueException`, `MethodArgumentResolutionException`) se rechazan sin reencolar y se derivan por **`styleradar.dlx`** (`DirectExchange`) hacia la cola **`styleradar.inventario.dlq`**.
+La comunicación asíncrona de `ms-playlist` se ejecuta a través de **RabbitMQ 3.13.7** (`5672` en local / `5671` AMQPS con TLS en QA) sobre el exchange principal compartido **`styleradar.exchange`** (`topic`, `durable = true`) en formato JSON UTF-8.
+
+* **Manejo de fallos y colas muertas (DLQ):** La cola consumidora `styleradar.playlist.prenda-retirada.q` está enlazada al Dead Letter Exchange **`styleradar.dlx`** hacia la cola **`styleradar.playlist.dlq`**.
+* **Desacoplamiento de tipos Java:** `RabbitMqConfig` elimina la cabecera `__TypeId__` al serializar mensajes salientes para evitar acoplamiento de clases entre microservicios.
+* **Resiliencia en entornos sin broker (PROD):** Todos los envíos en `RabbitMQEventPublisher` pasan por el método centralizado `enviar(...)` protegido con `try/catch (AmqpException)`, registrando una advertencia en logs sin interrumpir ni retornar `500` en las operaciones REST cuando RabbitMQ no está disponible.
 
 ### Matriz de Eventos AMQP
 
 | Tipo | Routing Key | Cola (Queue) | Microservicio Emisor / Receptor | Cuándo se Dispara / Acción |
 | :---: | :--- | :--- | :--- | :--- |
-| **PUBLICA** | `styleradar.inventario.actualizado` | N/A *(publicado al exchange `styleradar.exchange`)* | `ms-inventario` $\rightarrow$ `ms-item-catalogo`, `ms-notifications`, `ms-estadisticas` | Se dispara en toda modificación de stock por talla (registro, lote, ajuste, reserva, confirmación, liberación o descuento). |
-| **PUBLICA** | `styleradar.inventario.stock.agotado` | N/A *(publicado al exchange `styleradar.exchange`)* | `ms-inventario` $\rightarrow$ `ms-item-catalogo`, `ms-estadisticas` | Se dispara adicionalmente cuando las unidades disponibles de una talla llegan a `0`. |
-| **PUBLICA** | `styleradar.inventario.stock.ultimas-unidades` | N/A *(publicado al exchange `styleradar.exchange`)* | `ms-inventario` $\rightarrow$ `ms-estadisticas`, suscriptores en `styleradar.exchange` | Se dispara adicionalmente cuando las unidades disponibles de una talla quedan entre `1` y el umbral (`≤ 3`). |
-| **CONSUME** | `styleradar.pagos.pago.confirmado` | `styleradar.inventario.pago-aprobado.q` *(DLQ: `styleradar.inventario.dlq`)* | `ms-pagos` $\rightarrow$ `ms-inventario` | Confirma la reserva y deduce `stockReservado` (soporta sobre `data` plano o lista `data.items[]`; registra `eventId`/`eventoId` en `eventos_procesados`). |
-| **CONSUME** | `styleradar.pagos.suscripcion.suspendida` | `styleradar.inventario.suscripcion-suspendida.q` *(DLQ: `styleradar.inventario.dlq`)* | `ms-pagos` $\rightarrow$ `ms-inventario` | Suspende por mora todo el inventario de la sede (`sedeId` o `tiendaId`), fijando `activo = false` y estado `SUSPENDIDO`. |
-| **CONSUME *(Cola lista sin binding)*** | `styleradar.pagos.pago.rechazado` *(pendiente confirmar con `ms-pagos`)* | `styleradar.inventario.pago-rechazado.q` *(DLQ: `styleradar.inventario.dlq`)* | `ms-pagos` $\rightarrow$ `ms-inventario` | Consumidor `onPagoRechazado` implementado para liberar reservas, pero sin `Binding` activo en `RabbitMqConfig` hasta confirmación del emisor. |
-
-> [!NOTE]
-> **Idempotencia y tolerancia a fallos del broker:**
-> * Los eventos consumidos verifican `eventoId` / `eventId` contra la tabla `eventos_procesados` en PostgreSQL para evitar doble confirmación o liberación ante reentregas.
-> * En publicación, `RabbitMqStockEventPublisherAdapter` captura `AmqpException` registrando advertencia en logs para que una indisponibilidad temporal del broker no aborte la transacción local en base de datos.
+| **PUBLICA** | `styleradar.playlist.creada` | — *(Topic `styleradar.exchange`)* | `ms-playlist` &rarr; `ms-estadisticas` (`:8420`) | Al crear exitosamente una nueva playlist (`POST /api/v1/playlists`). Alimenta el indicador `PLATFORM_PLAYLISTS_CREATED`. |
+| **PUBLICA** | `styleradar.playlist.destacada.actualizada` | — *(Topic `styleradar.exchange`)* | `ms-playlist` &rarr; Suscriptores en `styleradar.exchange` | Al fijar (`PUT .../featured`) o remover (`DELETE .../featured`) una playlist como destacada. |
+| **PUBLICA** | `styleradar.playlist.prenda.asociada` | — *(Topic `styleradar.exchange`)* | `ms-playlist` &rarr; Suscriptores en `styleradar.exchange` | Al crear una playlist con prendas o al asociar una prenda aprobada (`POST .../garments`). |
+| **CONSUME** | `styleradar.catalogo.prenda.retirada` | `styleradar.playlist.prenda-retirada.q` | `ms-item-catalogo` (`:8220`) &rarr; `ms-playlist` | Cuando un almacén o administrador retira una prenda del catálogo; `CatalogoEventsConsumer` marca `disponible = false` en todas las playlists que la contengan. |
 
 <details>
-<summary><b>Click para ver Esquema JSON del Evento Publicado y Consumido</b></summary>
+<summary><b>Click para ver Esquema JSON de los Eventos Publicados y Consumidos</b></summary>
 
-#### 1. Evento Publicado: `styleradar.inventario.actualizado`
+#### 1. Evento Publicado: `styleradar.playlist.creada`
+
 ```json
 {
-  "eventoId": "9c2e8a74-1f3b-4c5d-8e9a-0b1c2d3e4f5a",
-  "eventId": "9c2e8a74-1f3b-4c5d-8e9a-0b1c2d3e4f5a",
-  "eventType": "styleradar.inventario.actualizado",
-  "timestamp": "2026-11-24T16:50:00Z",
-  "producer": "ms-inventario",
+  "eventId": "550e8400-e29b-41d4-a716-446655440101",
+  "eventType": "styleradar.playlist.creada",
+  "occurredAt": "2026-11-24T16:15:00Z",
+  "timestamp": "2026-11-24T16:15:00Z",
+  "producer": "ms-playlist",
   "data": {
-    "prendaId": "bb6c7f7f-d743-46f3-aa8d-b6d61ef1cfc4",
-    "sedeId": "fc942335-ab30-350a-b6a5-577cf0ca2fb5",
-    "talla": "M",
-    "stockAnterior": 10,
-    "stockDisponible": 3,
-    "stockReservado": 0,
-    "estado": "ACTUALIZADO"
+    "playlistId": "b1b7e6d2-4d30-4f8f-9d9c-1f2e3a4b5c6d"
   }
 }
 ```
 
-#### 2. Evento Publicado: `styleradar.inventario.stock.ultimas-unidades` y `styleradar.inventario.stock.agotado`
-```json
-{
-  "eventoId": "a1b2c3d4-e5f6-4789-abcd-111111111111",
-  "eventId": "a1b2c3d4-e5f6-4789-abcd-111111111111",
-  "eventType": "styleradar.inventario.stock.agotado",
-  "timestamp": "2026-11-24T16:50:00Z",
-  "producer": "ms-inventario",
-  "data": {
-    "prendaId": "bb6c7f7f-d743-46f3-aa8d-b6d61ef1cfc4",
-    "sedeId": "fc942335-ab30-350a-b6a5-577cf0ca2fb5",
-    "talla": "XL",
-    "stockRestante": 0,
-    "estado": "AGOTADA"
-  }
-}
-```
-*(Para `styleradar.inventario.stock.ultimas-unidades`, el campo `estado` toma el valor `"ULTIMAS_UNIDADES"` y `stockRestante` contiene el saldo entre `1` y `3`.)*
+#### 2. Evento Publicado: `styleradar.playlist.destacada.actualizada`
 
-#### 3. Evento Consumido: `styleradar.pagos.pago.confirmado` (soporta `data` plano o `data.items[]`)
 ```json
 {
-  "eventoId": "evt-pagos-items-1",
-  "eventType": "styleradar.pagos.pago.confirmado",
+  "eventId": "550e8400-e29b-41d4-a716-446655440102",
+  "eventType": "styleradar.playlist.destacada.actualizada",
+  "timestamp": "2026-11-24T16:20:00Z",
+  "producer": "ms-playlist",
   "data": {
-    "sedeId": "fc942335-ab30-350a-b6a5-577cf0ca2fb5",
-    "items": [
-      {
-        "prendaId": "bb6c7f7f-d743-46f3-aa8d-b6d61ef1cfc4",
-        "talla": "M",
-        "cantidad": 2
-      }
-    ]
+    "playlistId": "b1b7e6d2-4d30-4f8f-9d9c-1f2e3a4b5c6d",
+    "destacada": true
   }
 }
 ```
 
-#### 4. Evento Consumido: `styleradar.pagos.suscripcion.suspendida`
+#### 3. Evento Publicado: `styleradar.playlist.prenda.asociada`
+
 ```json
 {
-  "eventoId": "evt-pagos-susp-1",
-  "eventType": "styleradar.pagos.suscripcion.suspendida",
+  "eventId": "550e8400-e29b-41d4-a716-446655440103",
+  "eventType": "styleradar.playlist.prenda.asociada",
+  "timestamp": "2026-11-24T16:21:00Z",
+  "producer": "ms-playlist",
   "data": {
-    "sedeId": "fc942335-ab30-350a-b6a5-577cf0ca2fb5"
+    "playlistId": "b1b7e6d2-4d30-4f8f-9d9c-1f2e3a4b5c6d",
+    "prendaId": "83114431-f823-47a1-b2db-6a62f70a780c"
   }
 }
 ```
-*(El consumidor acepta indistintamente `sedeId` o `tiendaId`, y busca `eventoId` o `eventId` en raíz o dentro de `data`.)*
+
+#### 4. Evento Consumido: `styleradar.catalogo.prenda.retirada`
+
+`CatalogoEventsConsumer` lee la clave `prendaId` en formato UUID desde la raíz del mensaje JSON:
+
+```json
+{
+  "eventId": "evt-cat-ret-8810",
+  "eventType": "styleradar.catalogo.prenda.retirada",
+  "prendaId": "83114431-f823-47a1-b2db-6a62f70a780c"
+}
+```
 
 </details>
 

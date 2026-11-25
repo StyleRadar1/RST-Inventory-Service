@@ -2,35 +2,50 @@
 
 ---
 
-## 11. SEGURIDAD, HABEAS DATA Y ANÁLISIS OWASP TOP 10
+## 11. SEGURIDAD, HABEAS DATA Y ANÁLISIS OWASP TOP 10:2025
 
-El diseño de `ms-inventario` se ajusta al principio de minimización de datos de la **Ley 1581 de 2012 (Habeas Data - Colombia)** y aplica controles técnicos alineados con **OWASP Top 10:2025**.
+`ms-playlist` aplica los lineamientos de protección de datos personales de la **Ley 1581 de 2012 (Habeas Data en Colombia)** y los controles del estándar **OWASP Top 10:2025** desde el diseño del agregado de dominio y sus adaptadores de entrada y salida.
 
-* **Documento técnico detallado:** [Análisis de Seguridad y OWASP Top 10:2025](../security/SeguridadYOwaspInventario.md) *(Nota: `[PENDIENTE: crear archivo docs/security/SeguridadYOwaspInventario.md]`)*
+* **Documento técnico detallado de seguridad:** [Análisis de Seguridad y OWASP Top 10:2025 (`ms-playlist`)](../security/analisis-seguridad-owasp-ms-playlist.md) *(`[PENDIENTE: crear el archivo docs/security/analisis-seguridad-owasp-ms-playlist.md con la matriz extendida si el repositorio aún no lo contiene]`)*
 
 ### Puntos de Control y Cumplimiento Normativo
 
-1. **Minimización de Datos y Ley 1581 de 2012 (Habeas Data):**
-   Bajo el patrón *Database-per-Service*, `ms-inventario` **no almacena datos personales identificables (PII)** de compradores ni administradores (sin nombres, correos electrónicos, documentos, teléfonos, datos biométricos ni medios de pago). Las tablas `inventario_items`, `inventario_tallas` y `eventos_procesados` únicamente guardan identificadores técnicos UUID (`id`, `prenda_id`, `sede_id`, `event_id`), tallas y cantidades numéricas.
-2. **A01 · Control de Acceso Roto (*Broken Access Control*):**
-   * En el flujo de registro por lote (`POST /api/v1/inventory/batch`), `RegistrarLoteStockUseCaseImpl` valida obligatoriamente contra `ms-item-catalogo` que la prenda pertenezca al almacén (`sedeId`) que intenta registrar existencias (`403 PRENDA_DE_OTRO_ALMACEN` si no coincide).
-   * Cuando una sede entra en mora (`styleradar.pagos.suscripcion.suspendida`), el agregado `StockItem` bloquea cualquier mutación (`403 INVENTARIO_SUSPENDIDO`).
-   * *Arquitectura de autorización:* `OpenApiConfig` documenta el esquema `bearerAuth` (JWT), delegando actualmente la validación de firma JWT y control de roles (`TIENDA`, `ADMIN`) al **API Gateway** antes de enrutar hacia `:8200` (el código interno no declara `SecurityFilterChain`).
-3. **A02 · Fallas Criptográficas y Protección de Secretos (*Cryptographic Failures*):**
-   Ninguna credencial de base de datos o mensajería reside en `application.yml` ni en el repositorio (todas se inyectan vía variables de entorno). Las conexiones en QA y PROD utilizan HTTPS en Azure Container Apps, `sslmode` configurable en PostgreSQL (`DB_SSL_MODE`) y **TLS/SSL con verificación de hostname** en RabbitMQ (`RABBITMQ_PORT=5671`, `RABBITMQ_SSL_ENABLED=true`, `RABBITMQ_SSL_VERIFY_HOSTNAME=true`).
-4. **A03 · Inyección (*Injection*):**
-   Todas las consultas en `SpringDataStockItemRepository` usan Spring Data JPA y JPQL parametrizado (`@Param`) sin concatenación SQL. Los DTOs de entrada aplican Bean Validation (`@Valid`, `@NotNull`, `@NotBlank`, `@NotEmpty`, `@Positive`, `@PositiveOrZero`) y los Value Objects (`Cantidad`, `Talla`) validan tipos y rangos en el dominio.
-5. **A04 · Diseño Inseguro (*Insecure Design*):**
-   * Consistencia concurrente protegida mediante bloqueo pesimista (`LockModeType.PESSIMISTIC_WRITE`) en `buscarPorPrendaYSedeConBloqueo` para evitar sobreventa ante múltiples reservas simultáneas.
-   * Idempotencia garantizada en `eventos_procesados` (`PostgreSqlEventoProcesadoAdapter`) para evitar descuentos o liberaciones duplicadas por reintentos de RabbitMQ.
-   * Tolerancia a fallos externos: timeouts explícitos en Feign (`5s` conexión / `15s` lectura), `503 CATALOGO_NO_DISPONIBLE` si catálogo falla, captura de `AmqpException` al publicar eventos y DLQ (`styleradar.inventario.dlq`) con `default-requeue-rejected: false`.
-6. **A05 · Configuración de Seguridad Incorrecta (*Security Misconfiguration*):**
-   * Exposición mínima de Actuator limitada únicamente a `health` e `info`; endpoint de salud acotado a `/api/v1/health`; `spring.jpa.open-in-view: false`; `hibernate.ddl-auto: validate` apoyado en Flyway; y pool HikariCP acotado (`maximum-pool-size: 3`).
-   * *Nota de endurecimiento CORS:* `CorsConfig` configura `allowedOriginPatterns: *` para facilitar pruebas desde Gateway y Swagger UI; en entornos productivos cerrados se recomienda restringir los orígenes permitidos al Gateway y dominio oficial del frontend.
-7. **A06 · Componentes Vulnerables y Análisis Estático:**
-   Dependencias centralizadas en Spring Boot `3.3.4` y Spring Cloud `2023.0.3`, con verificación automática de **SpotBugs `4.8.6.4`** (`Max` / `High`, actualmente **`0` bugs**) y paso opcional de SonarQube en `ci.yml`.
-8. **A09 / A10 · Manejo Seguro de Errores y Trazabilidad:**
-   `GlobalExceptionHandler` captura todas las excepciones de dominio, validación, deserialización HTTP e imprevistos (`Exception` $\rightarrow$ `500 ERROR_INTERNO`) entregando respuestas **RFC 7807 (`application/problem+json`)** con `code` y `timestamp`, evitando exponer *stack traces*, nombres de tablas o detalles internos al cliente.
+1. **Ley 1581 de 2012 / Minimización y Supresión de Datos (Habeas Data):**
+   `ms-playlist` no almacena ni procesa datos personales sensibles ni PII (nombres civiles, correos electrónicos, teléfonos, documentos de identidad o fotografías biométricas). Únicamente persiste el identificador opaco `usuario_id` propagado por el API Gateway y el snapshot básico de prendas (`prenda_id`, `nombre_prenda`). Los eventos publicados en RabbitMQ contienen únicamente UUIDs (`playlistId`, `prendaId`), excluyendo cualquier dato personal. El titular puede suprimir sus colecciones o prendas asociadas en cualquier momento vía `DELETE /api/v1/playlists/{id}` y `DELETE /api/v1/playlists/{id}/garments/{garmentId}`.
+
+2. **A01:2025 — Pérdida de Control de Acceso (incluye SSRF):**
+   * *Propiedad de recursos:* `Playlist.validarPropietario(usuarioId)` impide que terceros editen, eliminen o modifiquen prendas de una playlist ajena (`403 ACCESO_DENEGADO`).
+   * *Privacidad de colecciones:* `Playlist.validarAccesoLectura(usuarioConsultaId)` bloquea el acceso a playlists `PRIVADA` para cualquier usuario distinto al dueño (`403 PLAYLIST_PRIVADA`).
+   * *Consulta por usuario:* `GET /api/v1/playlists/users/{userId}` y `GET /api/v1/playlists/users/{userId}/saved` verifican que `{userId}` coincida exactamente con la cabecera `X-User-Id` autenticada (`403 ACCESO_DENEGADO`).
+   * *Autorización por rol administrativo:* `PUT` y `DELETE /api/v1/playlists/{id}/featured` exigen explícitamente el rol `STYLERADAR_ADMIN` o `ADMIN_STYLERADAR` (incluyendo variantes `ROLE_*`) leído desde `X-User-Role` / `X-User-Roles` (`403 ACCESO_DENEGADO`).
+   * *Mitigación de SSRF:* El cliente `ItemCatalogoFeignClient` únicamente realiza peticiones `GET` hacia la URL base fija configurada por infraestructura (`ITEM_CATALOGO_URL`) concatenando un parámetro tipado `UUID`, sin aceptar URLs arbitrarias desde el cliente.
+
+3. **A02:2025 — Configuración de Seguridad Incorrecta:**
+   Desactivación de `spring.jpa.open-in-view` (`false`), validación estricta de esquema (`ddl-auto: validate`), exposición mínima de Actuator (`health, info` únicamente), supresión de cabeceras Java `__TypeId__` en mensajes salientes AMQP y cero credenciales quemadas en `application.yml`.
+
+4. **A03:2025 — Fallas en la Cadena de Suministro de Software:**
+   Gestión centralizada de dependencias mediante Maven Wrapper (`./mvnw`) y BOM de Spring Boot, acompañada de análisis estático con SpotBugs en el pipeline de CI/CD (`[PENDIENTE: confirmar si el pipeline ejecuta escaneo de CVEs / OWASP Dependency-Check o Dependabot]`).
+
+5. **A04:2025 — Fallas Criptográficas:**
+   Transporte cifrado obligatorio en entornos cloud: conexiones JDBC a PostgreSQL parametrizadas con `DB_SSL_MODE` (`require` recomendado en QA/PROD), conexión RabbitMQ por puerto AMQPS `5671` con `RABBITMQ_SSL_ENABLED=true` y `RABBITMQ_SSL_VERIFY_HOSTNAME=true`, y comunicación HTTPS hacia `ms-item-catalogo`.
+
+6. **A05:2025 — Inyección:**
+   Acceso a base de datos exclusivamente mediante Spring Data JPA y consultas JPQL con parámetros nombrados (`@Param("prendaId")`), validación de tipos fuertes (`UUID` en path y DTOs) y reglas `@NotBlank`, `@NotNull`, `@Size` de Jakarta Validation antes de ingresar al dominio.
+
+7. **A06:2025 — Diseño Inseguro:**
+   Invariantes críticas aplicadas dentro del agregado `Playlist` (`MAX_PRENDAS = 15`, `MAX_DESTACADAS = 3`, mínimo 1 prenda aprobada al crear, longitud máxima de nombre 100 y descripción 300 caracteres) junto con límite estricto del pool HikariCP (`maximum-pool-size: 3`) para evitar agotamiento de conexiones en el servidor compartido.
+
+8. **A07:2025 — Fallas de Autenticación:**
+   Autenticación JWT delegada a `ms-auth` y `API Gateway`. Todo endpoint protegido de `ms-playlist` exige `X-User-Id` no nulo y no vacío, respondiendo `401 USUARIO_NO_AUTENTICADO` si falta o viene en blanco. *(Recomendación de despliegue: mantener `ms-playlist` accesible únicamente a través del API Gateway / red interna de Azure Container Apps para impedir inyección externa directa de cabeceras `X-User-*`).*
+
+9. **A08:2025 — Fallas en la Integridad del Software o de los Datos:**
+   Evolución controlada del esquema DDL mediante migraciones versionadas en `Flyway` y consumo seguro en `CatalogoEventsConsumer` sobre `Map<String, Object>` con validación estricta `UUID.fromString(...)`, evitando deserialización polimórfica arbitraria.
+
+10. **A09:2025 — Fallas en el Registro, Alerta y Monitoreo de Seguridad:**
+    Registro controlado de incidentes operativos en `GlobalExceptionHandler` (`log.error`), `ItemCatalogoClient` (`log.error`), `RabbitMQEventPublisher` (`log.warn`) y `CatalogoEventsConsumer` (`log.warn` ante payloads inválidos), garantizando ausencia de credenciales o tokens en los logs.
+
+11. **A10:2025 — Manejo Inadecuado de Condiciones Excepcionales:**
+    Normalización de todas las respuestas de error en `GlobalExceptionHandler` bajo **RFC 7807** (`application/problem+json` con `code` y `timestamp`, sin exponer *stacktraces* en `500 ERROR_INTERNO`), degradación controlada `503 CATALOGO_NO_DISPONIBLE` ante fallos de `ms-item-catalogo` y captura segura de `AmqpException` en `RabbitMQEventPublisher.enviar(...)` para evitar errores `500` en entornos sin RabbitMQ.
 
 ---
 
