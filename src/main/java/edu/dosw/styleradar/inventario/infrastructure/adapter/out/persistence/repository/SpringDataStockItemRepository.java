@@ -2,6 +2,8 @@ package edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.re
 
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.entity.StockItemJpaEntity;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -28,6 +30,13 @@ public interface SpringDataStockItemRepository extends JpaRepository<StockItemJp
 
     @EntityGraph(attributePaths = "variantes")
     List<StockItemJpaEntity> findBySedeId(UUID sedeId);
+
+    @EntityGraph(attributePaths = "variantes")
+    Page<StockItemJpaEntity> findBySedeId(UUID sedeId, Pageable pageable);
+
+    @Override
+    @EntityGraph(attributePaths = "variantes")
+    Page<StockItemJpaEntity> findAll(Pageable pageable);
 
     @Query("SELECT DISTINCT s FROM StockItemJpaEntity s JOIN s.variantes v " +
            "WHERE UPPER(v.talla) = UPPER(:talla) AND v.unidadesDisponibles > 0 AND s.activo = true " +

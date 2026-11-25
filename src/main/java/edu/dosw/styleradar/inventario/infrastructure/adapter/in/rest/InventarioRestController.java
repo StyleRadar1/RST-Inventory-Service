@@ -36,6 +36,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -67,6 +68,23 @@ public class InventarioRestController {
         this.gestionarReservaUseCase = gestionarReservaUseCase;
         this.consultarStockUseCase = consultarStockUseCase;
         this.filtrarPrendasPorTallaUseCase = filtrarPrendasPorTallaUseCase;
+    }
+
+    @Operation(summary = "List inventory items",
+            description = "Lists inventory stock items, optionally filtered by branchId/storeId or X-Store-Id/X-Almacen-Id headers")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inventory items retrieved")
+    })
+    @GetMapping
+    public ResponseEntity<List<StockItemResponseDTO>> listInventory(
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) String storeId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestHeader(value = AutorizacionInventario.HEADER_STORE_ID, required = false) String storeIdHeader,
+            @RequestHeader(value = AutorizacionInventario.HEADER_ALMACEN_ID, required = false) String almacenIdHeader) {
+        UUID sedeId = AutorizacionInventario.resolverSede(branchId, storeId, storeIdHeader, almacenIdHeader);
+        return ResponseEntity.ok(consultarStockUseCase.listarInventario(sedeId, page, size));
     }
 
     @Operation(summary = "Check garment availability",
@@ -150,7 +168,10 @@ public class InventarioRestController {
     })
     @PostMapping
     public ResponseEntity<StockItemResponseDTO> registerStock(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody RegistrarStockCommand command) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         StockItemResponseDTO response = registrarStockUseCase.ejecutar(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -179,7 +200,10 @@ public class InventarioRestController {
     })
     @PostMapping("/batch")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> registerBatch(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody RegistrarLoteStockCommand command) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         DisponibilidadPrendaResponseDTO response = registrarLoteStockUseCase.registrarLote(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -201,7 +225,10 @@ public class InventarioRestController {
     public ResponseEntity<StockItemResponseDTO> adjustStock(
             @Parameter(description = "StockItem UUID identifier", required = true)
             @PathVariable UUID id,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody AjustarStockCommand command) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         AjustarStockCommand adjustedCommand = new AjustarStockCommand(id, command.talla(), command.nuevaCantidad());
         StockItemResponseDTO response = ajustarStockUseCase.ejecutar(adjustedCommand);
         return ResponseEntity.ok(response);
@@ -231,7 +258,10 @@ public class InventarioRestController {
             @PathVariable UUID branchId,
             @Parameter(description = "Typified size to modify", required = true)
             @PathVariable String size,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody ActualizarDisponibilidadDTO request) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
                 garmentId, branchId, size, request.unidades());
         return ResponseEntity.ok(response);
@@ -255,7 +285,11 @@ public class InventarioRestController {
     })
     @PostMapping("/reservations")
     public ResponseEntity<ReservaResponseDTO> reserveStock(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody ReservarStockCommand command) {
+        AutorizacionInventario.exigirAutenticado(usuarioId, rol, roles);
         ReservaResponseDTO response = gestionarReservaUseCase.reservar(command);
         return ResponseEntity.ok(response);
     }
@@ -275,7 +309,12 @@ public class InventarioRestController {
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping("/reservations/confirm")
-    public ResponseEntity<Void> confirmReservation(@Valid @RequestBody ConfirmarReservaCommand command) {
+    public ResponseEntity<Void> confirmReservation(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
+            @Valid @RequestBody ConfirmarReservaCommand command) {
+        AutorizacionInventario.exigirAutenticado(usuarioId, rol, roles);
         gestionarReservaUseCase.confirmar(command);
         return ResponseEntity.ok().build();
     }
@@ -292,7 +331,12 @@ public class InventarioRestController {
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping("/reservations/release")
-    public ResponseEntity<Void> releaseReservation(@Valid @RequestBody LiberarReservaCommand command) {
+    public ResponseEntity<Void> releaseReservation(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
+            @Valid @RequestBody LiberarReservaCommand command) {
+        AutorizacionInventario.exigirAutenticado(usuarioId, rol, roles);
         gestionarReservaUseCase.liberar(command);
         return ResponseEntity.ok().build();
     }

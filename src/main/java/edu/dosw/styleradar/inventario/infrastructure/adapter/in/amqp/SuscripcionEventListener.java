@@ -9,6 +9,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
@@ -37,7 +38,10 @@ public class SuscripcionEventListener {
         }
         UUID sedeId = extraerUuid(payload, "sedeId", "tiendaId");
         if (sedeId == null) {
-            log.warn("Payload de suscripción suspendida inválido o sin sedeId/tiendaId: {}", payload);
+            sedeId = extraerUuidDesdeNit(payload);
+        }
+        if (sedeId == null) {
+            log.warn("Payload de suscripción suspendida inválido o sin sedeId/tiendaId/nit: {}", payload);
             return;
         }
         suspenderInventarioUseCase.suspenderPorSede(sedeId);
@@ -74,6 +78,24 @@ public class SuscripcionEventListener {
             }
         }
         return extraerUuidDirecto(payload, claves);
+    }
+
+    private static UUID extraerUuidDesdeNit(Map<?, ?> payload) {
+        if (payload == null) {
+            return null;
+        }
+        String nit = null;
+        Object dataObj = payload.get("data");
+        if (dataObj instanceof Map<?, ?> dataMap) {
+            nit = extraerStringDirecto(dataMap, "nit", "storeNit");
+        }
+        if (nit == null) {
+            nit = extraerStringDirecto(payload, "nit", "storeNit");
+        }
+        if (nit == null) {
+            return null;
+        }
+        return UUID.nameUUIDFromBytes(("ms-tiendas:almacen:" + nit.trim()).getBytes(StandardCharsets.UTF_8));
     }
 
     private static UUID extraerUuidDirecto(Map<?, ?> map, String... claves) {
