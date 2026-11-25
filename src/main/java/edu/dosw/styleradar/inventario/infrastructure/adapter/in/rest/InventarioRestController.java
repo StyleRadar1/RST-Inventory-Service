@@ -45,7 +45,7 @@ import java.util.UUID;
 
 @Tag(name = "Inventory", description = "Endpoints for multi-branch inventory registration, adjustment, reservations, consultation, and stock filtering")
 @RestController
-@RequestMapping("/api/v1/inventory")
+@RequestMapping({"/api/v1/inventory", "/api/v1/inventario"})
 public class InventarioRestController {
 
     private final RegistrarStockUseCase registrarStockUseCase;
@@ -78,9 +78,9 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "404", description = "Garment not found in inventory (INVENTARIO_NO_ENCONTRADO)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventory/garments/{garmentId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventory/garment/{garmentId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
-    @GetMapping("/garments/{garmentId}")
+    @GetMapping({"/garment/{garmentId}", "/prenda/{garmentId}"})
     public ResponseEntity<DisponibilidadPrendaResponseDTO> getByGarmentId(
             @Parameter(description = "Garment UUID identifier", required = true)
             @PathVariable UUID garmentId) {
@@ -98,7 +98,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @GetMapping("/garments/{garmentId}/availability")
+    @GetMapping({"/garment/{garmentId}/availability", "/prenda/{garmentId}/disponibilidad"})
     public ResponseEntity<VerificacionDisponibilidadDTO> verifyAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
             @PathVariable UUID garmentId) {
@@ -111,7 +111,7 @@ public class InventarioRestController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of available garments returned")
     })
-    @GetMapping("/branches/{branchId}/available")
+    @GetMapping({"/branches/{branchId}/available", "/sedes/{branchId}/disponibles"})
     public ResponseEntity<List<UUID>> listAvailableGarmentsByBranch(
             @Parameter(description = "Branch UUID identifier", required = true)
             @PathVariable UUID branchId) {
@@ -125,13 +125,16 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "List of garments available in the selected size",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
-    @GetMapping("/sizes/{size}/garments")
+    @GetMapping({"/sizes/{size}/garments", "/tallas/{size}/prendas"})
     public ResponseEntity<List<UUID>> filterGarmentsBySize(
             @Parameter(description = "Typified size to query (e.g., 'M', 'L', '40')", required = true)
             @PathVariable String size,
             @Parameter(description = "Optional physical branch UUID identifier to narrow down the geographic filter")
-            @RequestParam(required = false) UUID branchId) {
-        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(size, branchId);
+            @RequestParam(required = false) UUID branchId,
+            @Parameter(description = "Legacy Spanish query parameter alias for branchId", hidden = true)
+            @RequestParam(required = false) UUID sedeId) {
+        UUID resolvedBranchId = branchId != null ? branchId : sedeId;
+        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(size, resolvedBranchId);
         return ResponseEntity.ok(prendas);
     }
 
@@ -177,7 +180,7 @@ public class InventarioRestController {
                             schema = @Schema(implementation = ProblemDetail.class),
                             examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Servicio de catálogo no disponible\",\"status\":503,\"detail\":\"El servicio de catálogo (ms-item-catalogo) no está disponible\",\"instance\":\"/api/v1/inventory/batch\",\"code\":\"CATALOGO_NO_DISPONIBLE\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
-    @PostMapping("/batch")
+    @PostMapping({"/batch", "/lote"})
     public ResponseEntity<DisponibilidadPrendaResponseDTO> registerBatch(
             @Valid @RequestBody RegistrarLoteStockCommand command) {
         DisponibilidadPrendaResponseDTO response = registrarLoteStockUseCase.registrarLote(command);
@@ -197,7 +200,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PutMapping("/{id}/adjustment")
+    @PutMapping({"/{id}/adjustment", "/{id}/ajuste"})
     public ResponseEntity<StockItemResponseDTO> adjustStock(
             @Parameter(description = "StockItem UUID identifier", required = true)
             @PathVariable UUID id,
@@ -223,7 +226,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PatchMapping("/garments/{garmentId}/branches/{branchId}/sizes/{size}")
+    @PatchMapping({"/garment/{garmentId}/branches/{branchId}/sizes/{size}", "/prenda/{garmentId}/sede/{branchId}/tallas/{size}"})
     public ResponseEntity<StockItemResponseDTO> updateSizeAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
             @PathVariable UUID garmentId,
@@ -253,7 +256,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reservations")
+    @PostMapping({"/reservations", "/reserva"})
     public ResponseEntity<ReservaResponseDTO> reserveStock(
             @Valid @RequestBody ReservarStockCommand command) {
         ReservaResponseDTO response = gestionarReservaUseCase.reservar(command);
@@ -274,7 +277,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reservations/confirm")
+    @PostMapping({"/reservations/confirm", "/reserva/confirmar"})
     public ResponseEntity<Void> confirmReservation(@Valid @RequestBody ConfirmarReservaCommand command) {
         gestionarReservaUseCase.confirmar(command);
         return ResponseEntity.ok().build();
@@ -291,7 +294,7 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reservations/release")
+    @PostMapping({"/reservations/release", "/reserva/liberar"})
     public ResponseEntity<Void> releaseReservation(@Valid @RequestBody LiberarReservaCommand command) {
         gestionarReservaUseCase.liberar(command);
         return ResponseEntity.ok().build();
