@@ -86,9 +86,9 @@ public class StockItem {
         Instant momento = requerirAhora(ahora);
 
         InventarioVariante variante = variantes.get(talla.getValor());
-        int stockAnterior;
+        Integer stockAnterior;
         if (variante == null) {
-            stockAnterior = 0;
+            stockAnterior = null;
             variante = new InventarioVariante(talla, cantidad, Cantidad.cero());
             variantes.put(talla.getValor(), variante);
         } else {
@@ -115,7 +115,7 @@ public class StockItem {
         Instant momento = requerirAhora(ahora);
 
         InventarioVariante variante = obtenerVariante(talla);
-        int stockAnterior = variante.getStockDisponible().valor();
+        Integer stockAnterior = variante.getStockDisponible().valor();
         variante.fijarStockDisponible(cantidad);
         fechaActualizacion = momento;
         evaluarEventosDeStock(variante, stockAnterior, momento);
@@ -127,7 +127,7 @@ public class StockItem {
         Instant momento = requerirAhora(ahora);
 
         InventarioVariante variante = obtenerVariante(talla);
-        int stockAnterior = variante.getStockDisponible().valor();
+        Integer stockAnterior = variante.getStockDisponible().valor();
         variante.reservar(requerirCantidad(cantidad));
         fechaActualizacion = momento;
         evaluarEventosDeStock(variante, stockAnterior, momento);
@@ -139,7 +139,7 @@ public class StockItem {
         Instant momento = requerirAhora(ahora);
 
         InventarioVariante variante = obtenerVariante(talla);
-        int stockAnterior = variante.getStockDisponible().valor();
+        Integer stockAnterior = variante.getStockDisponible().valor();
         variante.confirmarReserva(requerirCantidad(cantidad));
         fechaActualizacion = momento;
         evaluarEventosDeStock(variante, stockAnterior, momento);
@@ -151,7 +151,7 @@ public class StockItem {
         Instant momento = requerirAhora(ahora);
 
         InventarioVariante variante = obtenerVariante(talla);
-        int stockAnterior = variante.getStockDisponible().valor();
+        Integer stockAnterior = variante.getStockDisponible().valor();
         variante.liberarReserva(requerirCantidad(cantidad));
         fechaActualizacion = momento;
         evaluarEventosDeStock(variante, stockAnterior, momento);
@@ -163,7 +163,7 @@ public class StockItem {
         Instant momento = requerirAhora(ahora);
 
         InventarioVariante variante = obtenerVariante(talla);
-        int stockAnterior = variante.getStockDisponible().valor();
+        Integer stockAnterior = variante.getStockDisponible().valor();
         variante.decrementarStock(requerirCantidad(cantidad));
         fechaActualizacion = momento;
         evaluarEventosDeStock(variante, stockAnterior, momento);
@@ -312,7 +312,7 @@ public class StockItem {
         }
     }
 
-    private void evaluarEventosDeStock(InventarioVariante variante, int stockAnterior, Instant ahora) {
+    private void evaluarEventosDeStock(InventarioVariante variante, Integer stockAnterior, Instant ahora) {
         int stockRestante = variante.getStockDisponible().valor();
 
         domainEvents.add(new StockActualizadoEvent(UUID.randomUUID(), prendaId, sedeId,

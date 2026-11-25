@@ -22,8 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -37,11 +37,13 @@ class RabbitMqStockEventPublisherAdapterTest {
     private RabbitMqStockEventPublisherAdapter publisher;
 
     @Test
-    @DisplayName("Publica StockActualizadoEvent con stockAnterior, stockDisponible, stockReservado y estado ACTUALIZADO")
-    void publicaStockActualizado() {
+    @DisplayName("Publica StockActualizadoEvent de creación inicial con tiendaId y stockAnterior null")
+    void publicaStockActualizadoCreacionInicial() {
         UUID eventId = UUID.randomUUID();
+        UUID prendaId = UUID.randomUUID();
+        UUID sedeId = UUID.randomUUID();
         StockActualizadoEvent evento = new StockActualizadoEvent(
-                eventId, UUID.randomUUID(), UUID.randomUUID(), "M", 0, 10, 0, Instant.now());
+                eventId, prendaId, sedeId, "M", null, 10, 0, Instant.now());
 
         publisher.publicar(evento);
 
@@ -60,10 +62,39 @@ class RabbitMqStockEventPublisherAdapterTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) payload.get("data");
         assertThat(data)
-                .containsEntry("stockAnterior", 0)
+                .containsEntry("prendaId", prendaId)
+                .containsEntry("tiendaId", sedeId)
+                .containsEntry("sedeId", sedeId)
+                .containsEntry("talla", "M")
+                .containsEntry("stockAnterior", null)
                 .containsEntry("stockDisponible", 10)
                 .containsEntry("stockReservado", 0)
                 .containsEntry("estado", "ACTUALIZADO");
+    }
+
+    @Test
+    @DisplayName("Publica StockActualizadoEvent de actualización con tiendaId y stockAnterior numérico")
+    void publicaStockActualizadoConStockAnterior() {
+        UUID eventId = UUID.randomUUID();
+        UUID sedeId = UUID.randomUUID();
+        StockActualizadoEvent evento = new StockActualizadoEvent(
+                eventId, UUID.randomUUID(), sedeId, "M", 0, 10, 0, Instant.now());
+
+        publisher.publicar(evento);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMqConfig.EXCHANGE_EVENTS),
+                eq("styleradar.inventario.actualizado"),
+                captor.capture());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) captor.getValue().get("data");
+        assertThat(data)
+                .containsEntry("tiendaId", sedeId)
+                .containsEntry("sedeId", sedeId)
+                .containsEntry("stockAnterior", 0)
+                .containsEntry("stockDisponible", 10);
     }
 
     @Test
