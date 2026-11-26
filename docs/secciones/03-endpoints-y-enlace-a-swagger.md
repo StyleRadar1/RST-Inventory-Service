@@ -38,6 +38,8 @@
 | `POST` | `/api/v1/inventory/reservations/release` | Liberar unidades reservadas y devolverlas al stock disponible | Interno | `200`, `400`, `403`, `404`, `409` |
 | `GET` | `/api/v1/health` | Estado del servicio (`UP`, `ms-inventario`, puerto `8200`) | Público | `200`, `500` |
 
+En `{branchId}` y en el `sedeId` del registro de stock y del lote se puede enviar el UUID de la sede o el NIT de la tienda en ms-tiendas; con el NIT se calcula el mismo UUID que usan ítem-catálogo y geolocalización.
+
 > [!NOTE]
 > **Dependencia síncrona con `ms-item-catalogo` y tolerancia a fallos:**
 > * El endpoint `POST /api/v1/inventory/batch` consulta de forma síncrona vía OpenFeign a `ms-item-catalogo` (`GET /api/v1/garments/{id}`) con timeouts de conexión de `5000 ms` y lectura de `15000 ms`.
