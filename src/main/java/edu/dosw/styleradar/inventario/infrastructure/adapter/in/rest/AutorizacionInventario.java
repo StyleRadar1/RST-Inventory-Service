@@ -2,8 +2,8 @@ package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
 import edu.dosw.styleradar.inventario.domain.exception.AccesoDenegadoException;
 import edu.dosw.styleradar.inventario.domain.exception.NoAutenticadoException;
+import edu.dosw.styleradar.inventario.domain.model.IdSede;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
@@ -42,16 +42,7 @@ final class AutorizacionInventario {
         if (branchId != null) {
             return branchId;
         }
-        String valor = firstNonBlank(storeIdParam, storeIdHeader, almacenIdHeader);
-        if (valor == null) {
-            return null;
-        }
-        String trimmed = valor.trim();
-        try {
-            return UUID.fromString(trimmed);
-        } catch (IllegalArgumentException e) {
-            return UUID.nameUUIDFromBytes(("ms-tiendas:almacen:" + trimmed).getBytes(StandardCharsets.UTF_8));
-        }
+        return IdSede.desdeTexto(firstNonBlank(storeIdParam, storeIdHeader, almacenIdHeader));
     }
 
     private static boolean tieneRolPermitido(String rol, String roles) {

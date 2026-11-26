@@ -1,5 +1,6 @@
 package edu.dosw.styleradar.inventario.application.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import edu.dosw.styleradar.inventario.domain.model.TipoPrenda;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ public record RegistrarLoteStockCommand(
 
         @NotNull(message = "El sedeId es obligatorio")
         @Schema(description = "Identificador UUID de la sede comercial", example = "018e3a2b-2222-7000-8000-000000000002")
+        @JsonDeserialize(using = IdSedeDeserializer.class)
         UUID sedeId,
 
         @NotNull(message = "El tipo de prenda es obligatorio")

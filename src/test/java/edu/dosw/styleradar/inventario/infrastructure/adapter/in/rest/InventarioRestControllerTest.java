@@ -24,6 +24,7 @@ import edu.dosw.styleradar.inventario.domain.exception.StockInsuficienteExceptio
 import edu.dosw.styleradar.inventario.domain.exception.TallaConUnidadesException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaInvalidaException;
 import edu.dosw.styleradar.inventario.domain.model.EstadoItem;
+import edu.dosw.styleradar.inventario.domain.model.IdSede;
 import edu.dosw.styleradar.inventario.domain.model.TipoPrenda;
 import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -157,6 +159,32 @@ class InventarioRestControllerTest {
         mockMvc.perform(get("/api/v1/inventory/branches/{branchId}/available", sedeId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value(prendaId.toString()));
+    }
+
+    @Test
+    @DisplayName("Las rutas de sede y el lote aceptan el NIT de la tienda")
+    void aceptaElNitDeLaTiendaComoSede() throws Exception {
+        UUID sedeDesdeNit = IdSede.desdeTexto("900555777-1");
+        UUID prendaId = UUID.randomUUID();
+        when(consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeDesdeNit)).thenReturn(List.of(prendaId));
+        when(registrarLoteStockUseCase.registrarLote(any())).thenReturn(new DisponibilidadPrendaResponseDTO(
+                prendaId, TipoPrenda.ROPA, EstadoItem.DISPONIBLE, 10, List.of()));
+
+        mockMvc.perform(get("/api/v1/inventory/branches/{branchId}/available", "900555777-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
+
+        mockMvc.perform(post("/api/v1/inventory/batch")
+                        .header(HEADER_ROL, STORE_ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"prendaId":"%s","sedeId":"900555777-1","tipoPrenda":"ROPA",
+                                 "tallas":[{"talla":"M","cantidad":10}],"fechaPublicacion":"2026-11-25T00:00:00Z"}
+                                """.formatted(prendaId)))
+                .andExpect(status().isCreated());
+
+        verify(registrarLoteStockUseCase).registrarLote(argThat(
+                command -> sedeDesdeNit.equals(command.sedeId())));
     }
 
     @Test

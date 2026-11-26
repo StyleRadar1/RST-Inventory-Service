@@ -11,6 +11,7 @@ import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
+import edu.dosw.styleradar.inventario.domain.model.IdSede;
 import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.FiltrarPrendasPorTallaUseCase;
@@ -131,9 +132,9 @@ public class InventarioRestController {
     })
     @GetMapping("/branches/{branchId}/available")
     public ResponseEntity<List<UUID>> listAvailableGarmentsByBranch(
-            @Parameter(description = "Branch UUID identifier", required = true)
-            @PathVariable UUID branchId) {
-        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(branchId);
+            @Parameter(description = "Branch UUID identifier or store NIT", required = true)
+            @PathVariable String branchId) {
+        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(IdSede.desdeTexto(branchId));
         return ResponseEntity.ok(disponibles);
     }
 
@@ -148,8 +149,8 @@ public class InventarioRestController {
             @Parameter(description = "Typified size to query (e.g., 'M', 'L', '40')", required = true)
             @PathVariable String size,
             @Parameter(description = "Optional physical branch UUID identifier to narrow down the geographic filter")
-            @RequestParam(required = false) UUID branchId) {
-        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(size, branchId);
+            @RequestParam(required = false) String branchId) {
+        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(size, IdSede.desdeTexto(branchId));
         return ResponseEntity.ok(prendas);
     }
 
@@ -254,8 +255,8 @@ public class InventarioRestController {
     public ResponseEntity<StockItemResponseDTO> updateSizeAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
             @PathVariable UUID garmentId,
-            @Parameter(description = "Branch UUID identifier", required = true)
-            @PathVariable UUID branchId,
+            @Parameter(description = "Branch UUID identifier or store NIT", required = true)
+            @PathVariable String branchId,
             @Parameter(description = "Typified size to modify", required = true)
             @PathVariable String size,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
@@ -263,7 +264,7 @@ public class InventarioRestController {
             @Valid @RequestBody ActualizarDisponibilidadDTO request) {
         AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
-                garmentId, branchId, size, request.unidades());
+                garmentId, IdSede.desdeTexto(branchId), size, request.unidades());
         return ResponseEntity.ok(response);
     }
 
