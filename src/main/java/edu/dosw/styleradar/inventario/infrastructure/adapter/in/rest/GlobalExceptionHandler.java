@@ -1,10 +1,12 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
+import edu.dosw.styleradar.inventario.domain.exception.AccesoDenegadoException;
 import edu.dosw.styleradar.inventario.domain.exception.CantidadInvalidaException;
 import edu.dosw.styleradar.inventario.domain.exception.CatalogoNoDisponibleException;
 import edu.dosw.styleradar.inventario.domain.exception.CodigoError;
 import edu.dosw.styleradar.inventario.domain.exception.DomainException;
 import edu.dosw.styleradar.inventario.domain.exception.InventarioSuspendidoException;
+import edu.dosw.styleradar.inventario.domain.exception.NoAutenticadoException;
 import edu.dosw.styleradar.inventario.domain.exception.PrendaDeOtroAlmacenException;
 import edu.dosw.styleradar.inventario.domain.exception.PrendaNoEncontradaEnCatalogoException;
 import edu.dosw.styleradar.inventario.domain.exception.ResourceNotFoundException;
@@ -16,6 +18,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -80,6 +83,23 @@ public class GlobalExceptionHandler {
     public ProblemDetail handlePrendaDeOtroAlmacen(PrendaDeOtroAlmacenException ex) {
         return problem(HttpStatus.FORBIDDEN, ex.getCodigoError(),
                 "Prenda no pertenece a la sede", ex.getMessage());
+    }
+
+    @ExceptionHandler(AccesoDenegadoException.class)
+    public ProblemDetail handleAccesoDenegado(AccesoDenegadoException ex) {
+        return problem(HttpStatus.FORBIDDEN, ex.getCodigoError(), "Acceso denegado", ex.getMessage());
+    }
+
+    @ExceptionHandler(NoAutenticadoException.class)
+    public ProblemDetail handleNoAutenticado(NoAutenticadoException ex) {
+        return problem(HttpStatus.UNAUTHORIZED, ex.getCodigoError(), "No autenticado", ex.getMessage());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ProblemDetail handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        return problem(HttpStatus.METHOD_NOT_ALLOWED, CodigoError.METODO_NO_PERMITIDO,
+                "Método HTTP no permitido",
+                "El método HTTP '" + ex.getMethod() + "' no está permitido para esta ruta");
     }
 
     @ExceptionHandler(CatalogoNoDisponibleException.class)

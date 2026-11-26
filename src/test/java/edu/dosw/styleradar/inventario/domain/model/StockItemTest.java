@@ -163,7 +163,7 @@ class StockItemTest {
     }
 
     @Test
-    @DisplayName("Disparo de StockActualizado (con stockAnterior), StockAgotado y StockBajo")
+    @DisplayName("Disparo de StockActualizado (null en creación inicial y entero en actualizaciones), StockAgotado y StockBajo")
     void disparoDeEventosDeDominio() {
         stockItem.registrarTalla(TallaRopa.XS, Cantidad.de(2), FECHA_PUBLICACION);
         List<DomainEvent> eventosBajo = stockItem.pullDomainEvents();
@@ -174,7 +174,7 @@ class StockItemTest {
                 .map(StockActualizadoEvent.class::cast)
                 .findFirst()
                 .orElseThrow();
-        assertThat(evtRegistro.stockAnterior()).isEqualTo(0);
+        assertThat(evtRegistro.stockAnterior()).isNull();
         assertThat(evtRegistro.stockDisponible()).isEqualTo(2);
         assertThat(stockItem.pullDomainEvents()).isEmpty();
 
@@ -196,6 +196,13 @@ class StockItemTest {
         StockActualizadoEvent evtReposicion = (StockActualizadoEvent) eventosReposicion.getFirst();
         assertThat(evtReposicion.stockAnterior()).isEqualTo(0);
         assertThat(evtReposicion.stockDisponible()).isEqualTo(8);
+
+        stockItem.registrarTalla(TallaRopa.XS, Cantidad.de(5), FECHA_PUBLICACION.plusSeconds(30));
+        List<DomainEvent> eventosReRegistro = stockItem.pullDomainEvents();
+        assertThat(eventosReRegistro).hasSize(1);
+        StockActualizadoEvent evtReRegistro = (StockActualizadoEvent) eventosReRegistro.getFirst();
+        assertThat(evtReRegistro.stockAnterior()).isEqualTo(8);
+        assertThat(evtReRegistro.stockDisponible()).isEqualTo(5);
     }
 
     @Test

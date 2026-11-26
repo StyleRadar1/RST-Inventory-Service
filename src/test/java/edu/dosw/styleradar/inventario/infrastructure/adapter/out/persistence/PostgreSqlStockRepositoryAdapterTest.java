@@ -18,6 +18,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.util.List;
@@ -161,5 +163,28 @@ class PostgreSqlStockRepositoryAdapterTest {
 
         verify(repository).save(any(StockItemJpaEntity.class));
         assertThat(guardado.getId()).isEqualTo(item.getId());
+    }
+
+    @Test
+    @DisplayName("listar pagina resultados filtrando por sede o listando todo")
+    void listarPaginaResultados() {
+        StockItemJpaEntity entity = new StockItemJpaEntity();
+        entity.setId(itemId);
+        entity.setPrendaId(prendaId);
+        entity.setSedeId(sedeId);
+        entity.setTipoPrenda(TipoPrenda.ROPA);
+        entity.setEstado(EstadoItem.DISPONIBLE);
+        entity.setUmbralUltimasUnidades(3);
+        entity.setActivo(true);
+        entity.setFechaPublicacion(ahora);
+        entity.setFechaActualizacion(ahora);
+
+        when(repository.findBySedeId(any(UUID.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(entity)));
+        when(repository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(entity)));
+
+        assertThat(adapter.listar(sedeId, 0, 10)).hasSize(1);
+        assertThat(adapter.listar(null, -1, 500)).hasSize(1);
     }
 }

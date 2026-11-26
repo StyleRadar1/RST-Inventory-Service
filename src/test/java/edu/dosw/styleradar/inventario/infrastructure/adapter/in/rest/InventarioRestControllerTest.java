@@ -24,6 +24,7 @@ import edu.dosw.styleradar.inventario.domain.exception.StockInsuficienteExceptio
 import edu.dosw.styleradar.inventario.domain.exception.TallaConUnidadesException;
 import edu.dosw.styleradar.inventario.domain.exception.TallaInvalidaException;
 import edu.dosw.styleradar.inventario.domain.model.EstadoItem;
+import edu.dosw.styleradar.inventario.domain.model.IdSede;
 import edu.dosw.styleradar.inventario.domain.model.TipoPrenda;
 import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
@@ -45,19 +46,26 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InventarioRestController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, CorrelationIdFilter.class})
 class InventarioRestControllerTest {
+
+    private static final String HEADER_ROL = "X-User-Role";
+    private static final String HEADER_USER_ID = "X-User-Id";
+    private static final String STORE_ADMIN = "STORE_ADMIN";
 
     @Autowired
     private MockMvc mockMvc;
@@ -84,7 +92,31 @@ class InventarioRestControllerTest {
     private FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase;
 
     @Test
-    @DisplayName("GET /api/v1/inventario/prenda/{prendaId} retorna 200 con desglose")
+    @DisplayName("GET /api/v1/inventory retorna 200 OK y soporta filtros branchId/storeId o headers")
+    void listarInventarioExitoso() throws Exception {
+        UUID sedeId = UUID.randomUUID();
+        StockItemResponseDTO item = new StockItemResponseDTO(
+                UUID.randomUUID(), UUID.randomUUID(), sedeId, TipoPrenda.ROPA, "M", 8, 1,
+                EstadoItem.DISPONIBLE, true, Instant.now());
+
+        when(consultarStockUseCase.listarInventario(null, 0, 20)).thenReturn(List.of());
+        when(consultarStockUseCase.listarInventario(sedeId, 0, 20)).thenReturn(List.of(item));
+
+        mockMvc.perform(get("/api/v1/inventory").header("X-Request-Id", "corr-inv-1"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Correlation-Id", "corr-inv-1"))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(get("/api/v1/inventory").param("branchId", sedeId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Correlation-Id"))
+                .andExpect(jsonPath("$[0].sedeId").value(sedeId.toString()))
+                .andExpect(jsonPath("$[0].talla").value("M"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/inventory/garments/{garmentId} retorna 200 con desglose")
     void consultarPrendaExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         DisponibilidadPrendaResponseDTO response = new DisponibilidadPrendaResponseDTO(
@@ -94,14 +126,14 @@ class InventarioRestControllerTest {
 
         when(consultarStockUseCase.consultarPorPrenda(prendaId)).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/inventario/prenda/{prendaId}", prendaId))
+        mockMvc.perform(get("/api/v1/inventory/garments/{garmentId}", prendaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.prendaId").value(prendaId.toString()))
                 .andExpect(jsonPath("$.stockDisponibleTotal").value(10));
     }
 
     @Test
-    @DisplayName("GET /api/v1/inventario/prenda/{prendaId}/disponibilidad retorna verificación para catálogo (RES-8)")
+    @DisplayName("GET /api/v1/inventory/garments/{garmentId}/availability retorna verificación para catálogo (RES-8)")
     void verificarDisponibilidadExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         VerificacionDisponibilidadDTO response = new VerificacionDisponibilidadDTO(
@@ -109,7 +141,7 @@ class InventarioRestControllerTest {
 
         when(consultarStockUseCase.verificarDisponibilidad(prendaId)).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/inventario/prenda/{prendaId}/disponibilidad", prendaId))
+        mockMvc.perform(get("/api/v1/inventory/garments/{garmentId}/availability", prendaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.prendaId").value(prendaId.toString()))
                 .andExpect(jsonPath("$.disponibleParaVenta").value(false))
@@ -117,32 +149,58 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/inventario/sedes/{sedeId}/disponibles retorna lista de IDs no agotados (RES-8)")
+    @DisplayName("GET /api/v1/inventory/branches/{branchId}/available retorna lista de IDs no agotados (RES-8)")
     void listarPrendasDisponiblesPorSedeExitoso() throws Exception {
         UUID sedeId = UUID.randomUUID();
         UUID prendaId = UUID.randomUUID();
 
         when(consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId)).thenReturn(List.of(prendaId));
 
-        mockMvc.perform(get("/api/v1/inventario/sedes/{sedeId}/disponibles", sedeId))
+        mockMvc.perform(get("/api/v1/inventory/branches/{branchId}/available", sedeId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value(prendaId.toString()));
     }
 
     @Test
-    @DisplayName("GET /api/v1/inventario/tallas/{talla}/prendas filtra prendas por talla (RES-24 / SR-RF-10)")
+    @DisplayName("Las rutas de sede y el lote aceptan el NIT de la tienda")
+    void aceptaElNitDeLaTiendaComoSede() throws Exception {
+        UUID sedeDesdeNit = IdSede.desdeTexto("900555777-1");
+        UUID prendaId = UUID.randomUUID();
+        when(consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeDesdeNit)).thenReturn(List.of(prendaId));
+        when(registrarLoteStockUseCase.registrarLote(any())).thenReturn(new DisponibilidadPrendaResponseDTO(
+                prendaId, TipoPrenda.ROPA, EstadoItem.DISPONIBLE, 10, List.of()));
+
+        mockMvc.perform(get("/api/v1/inventory/branches/{branchId}/available", "900555777-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
+
+        mockMvc.perform(post("/api/v1/inventory/batch")
+                        .header(HEADER_ROL, STORE_ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"prendaId":"%s","sedeId":"900555777-1","tipoPrenda":"ROPA",
+                                 "tallas":[{"talla":"M","cantidad":10}],"fechaPublicacion":"2026-11-25T00:00:00Z"}
+                                """.formatted(prendaId)))
+                .andExpect(status().isCreated());
+
+        verify(registrarLoteStockUseCase).registrarLote(argThat(
+                command -> sedeDesdeNit.equals(command.sedeId())));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/inventory/sizes/{size}/garments filtra prendas por talla (RES-24 / SR-RF-10)")
     void filtrarPrendasPorTallaExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         when(filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(eq("M"), any()))
                 .thenReturn(List.of(prendaId));
 
-        mockMvc.perform(get("/api/v1/inventario/tallas/{talla}/prendas", "M"))
+        mockMvc.perform(get("/api/v1/inventory/sizes/{size}/garments", "M"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value(prendaId.toString()));
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario registra existencias y retorna 201 Created")
+    @DisplayName("POST /api/v1/inventory registra existencias y retorna 201 Created")
     void registrarStockExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         UUID sedeId = UUID.randomUUID();
@@ -155,7 +213,8 @@ class InventarioRestControllerTest {
 
         when(registrarStockUseCase.ejecutar(any())).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/inventario")
+        mockMvc.perform(post("/api/v1/inventory")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isCreated())
@@ -164,7 +223,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/lote registra conjunto de tallas y retorna 201 Created (RES-6)")
+    @DisplayName("POST /api/v1/inventory/batch registra conjunto de tallas y retorna 201 Created (RES-6)")
     void registrarLoteStockExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         UUID sedeId = UUID.randomUUID();
@@ -177,7 +236,8 @@ class InventarioRestControllerTest {
 
         when(registrarLoteStockUseCase.registrarLote(any())).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/inventario/lote")
+        mockMvc.perform(post("/api/v1/inventory/batch")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isCreated())
@@ -185,7 +245,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/lote retorna 404 PRENDA_NO_ENCONTRADA si no existe en catálogo")
+    @DisplayName("POST /api/v1/inventory/batch retorna 404 PRENDA_NO_ENCONTRADA si no existe en catálogo")
     void registrarLotePrendaNoExisteRetorna404() throws Exception {
         RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
                 UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA,
@@ -194,7 +254,8 @@ class InventarioRestControllerTest {
         when(registrarLoteStockUseCase.registrarLote(any()))
                 .thenThrow(new PrendaNoEncontradaEnCatalogoException("No existe en catálogo"));
 
-        mockMvc.perform(post("/api/v1/inventario/lote")
+        mockMvc.perform(post("/api/v1/inventory/batch")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isNotFound())
@@ -203,7 +264,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/lote retorna 403 PRENDA_DE_OTRO_ALMACEN si la sede no coincide")
+    @DisplayName("POST /api/v1/inventory/batch retorna 403 PRENDA_DE_OTRO_ALMACEN si la sede no coincide")
     void registrarLotePrendaOtroAlmacenRetorna403() throws Exception {
         RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
                 UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA,
@@ -212,7 +273,8 @@ class InventarioRestControllerTest {
         when(registrarLoteStockUseCase.registrarLote(any()))
                 .thenThrow(new PrendaDeOtroAlmacenException("Pertenece a otro almacén"));
 
-        mockMvc.perform(post("/api/v1/inventario/lote")
+        mockMvc.perform(post("/api/v1/inventory/batch")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isForbidden())
@@ -221,7 +283,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/lote retorna 503 CATALOGO_NO_DISPONIBLE si ms-item-catalogo no responde")
+    @DisplayName("POST /api/v1/inventory/batch retorna 503 CATALOGO_NO_DISPONIBLE si ms-item-catalogo no responde")
     void registrarLoteCatalogoNoDisponibleRetorna503() throws Exception {
         RegistrarLoteStockCommand command = new RegistrarLoteStockCommand(
                 UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA,
@@ -230,7 +292,8 @@ class InventarioRestControllerTest {
         when(registrarLoteStockUseCase.registrarLote(any()))
                 .thenThrow(new CatalogoNoDisponibleException("Catálogo caído"));
 
-        mockMvc.perform(post("/api/v1/inventario/lote")
+        mockMvc.perform(post("/api/v1/inventory/batch")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isServiceUnavailable())
@@ -239,7 +302,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/inventario/{id}/ajuste actualiza stock y retorna 200 OK")
+    @DisplayName("PUT /api/v1/inventory/{id}/adjustment actualiza stock y retorna 200 OK")
     void ajustarStockExitoso() throws Exception {
         UUID itemId = UUID.randomUUID();
         AjustarStockCommand command = new AjustarStockCommand(itemId, "M", 15);
@@ -249,7 +312,8 @@ class InventarioRestControllerTest {
 
         when(ajustarStockUseCase.ejecutar(any())).thenReturn(response);
 
-        mockMvc.perform(put("/api/v1/inventario/{id}/ajuste", itemId)
+        mockMvc.perform(put("/api/v1/inventory/{id}/adjustment", itemId)
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isOk())
@@ -257,7 +321,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /api/v1/inventario/prenda/{prendaId}/sede/{sedeId}/tallas/{talla} modifica disponibilidad (RES-7)")
+    @DisplayName("PATCH /api/v1/inventory/garments/{garmentId}/branches/{branchId}/sizes/{size} modifica disponibilidad (RES-7)")
     void actualizarDisponibilidadTallaExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         UUID sedeId = UUID.randomUUID();
@@ -270,7 +334,9 @@ class InventarioRestControllerTest {
         when(ajustarStockUseCase.actualizarPorPrendaYSede(eq(prendaId), eq(sedeId), eq("M"), eq(20)))
                 .thenReturn(response);
 
-        mockMvc.perform(patch("/api/v1/inventario/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}", prendaId, sedeId, "M")
+        mockMvc.perform(patch("/api/v1/inventory/garments/{garmentId}/branches/{branchId}/sizes/{size}",
+                        prendaId, sedeId, "M")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -279,7 +345,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/reserva retorna 200 OK con reserva exitosa")
+    @DisplayName("POST /api/v1/inventory/reservations retorna 200 OK con reserva exitosa")
     void reservarStockExitoso() throws Exception {
         UUID prendaId = UUID.randomUUID();
         UUID sedeId = UUID.randomUUID();
@@ -288,7 +354,8 @@ class InventarioRestControllerTest {
 
         when(gestionarReservaUseCase.reservar(any())).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/inventario/reserva")
+        mockMvc.perform(post("/api/v1/inventory/reservations")
+                        .header(HEADER_USER_ID, "10")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isOk())
@@ -297,7 +364,7 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/reserva con saldo insuficiente mapea a 409 Conflict")
+    @DisplayName("POST /api/v1/inventory/reservations con saldo insuficiente mapea a 409 Conflict")
     void reservarStockInsuficienteRetorna409() throws Exception {
         UUID prendaId = UUID.randomUUID();
         UUID sedeId = UUID.randomUUID();
@@ -306,7 +373,8 @@ class InventarioRestControllerTest {
         when(gestionarReservaUseCase.reservar(any()))
                 .thenThrow(new StockInsuficienteException("Stock disponible insuficiente"));
 
-        mockMvc.perform(post("/api/v1/inventario/reserva")
+        mockMvc.perform(post("/api/v1/inventory/reservations")
+                        .header(HEADER_USER_ID, "10")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isConflict())
@@ -316,11 +384,12 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/reserva/confirmar retorna 200 OK")
+    @DisplayName("POST /api/v1/inventory/reservations/confirm retorna 200 OK")
     void confirmarReservaExitoso() throws Exception {
         ConfirmarReservaCommand command = new ConfirmarReservaCommand(UUID.randomUUID(), UUID.randomUUID(), "M", 2);
 
-        mockMvc.perform(post("/api/v1/inventario/reserva/confirmar")
+        mockMvc.perform(post("/api/v1/inventory/reservations/confirm")
+                        .header(HEADER_USER_ID, "10")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isOk());
@@ -329,11 +398,12 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/inventario/reserva/liberar retorna 200 OK")
+    @DisplayName("POST /api/v1/inventory/reservations/release retorna 200 OK")
     void liberarReservaExitoso() throws Exception {
         LiberarReservaCommand command = new LiberarReservaCommand(UUID.randomUUID(), UUID.randomUUID(), "M", 2);
 
-        mockMvc.perform(post("/api/v1/inventario/reserva/liberar")
+        mockMvc.perform(post("/api/v1/inventory/reservations/release")
+                        .header(HEADER_USER_ID, "10")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isOk());
@@ -347,7 +417,8 @@ class InventarioRestControllerTest {
         RegistrarStockCommand commandInvalido = new RegistrarStockCommand(
                 null, null, TipoPrenda.ROPA, "", -1, null);
 
-        mockMvc.perform(post("/api/v1/inventario")
+        mockMvc.perform(post("/api/v1/inventory")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(commandInvalido)))
                 .andExpect(status().isBadRequest())
@@ -363,7 +434,8 @@ class InventarioRestControllerTest {
         when(ajustarStockUseCase.ejecutar(any()))
                 .thenThrow(new ResourceNotFoundException("No se encontró"));
 
-        mockMvc.perform(put("/api/v1/inventario/{id}/ajuste", itemId)
+        mockMvc.perform(put("/api/v1/inventory/{id}/adjustment", itemId)
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"talla\":\"M\",\"nuevaCantidad\":5}"))
                 .andExpect(status().isNotFound())
@@ -380,7 +452,8 @@ class InventarioRestControllerTest {
         RegistrarStockCommand command = new RegistrarStockCommand(
                 UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA, "40", 5, Instant.now());
 
-        mockMvc.perform(post("/api/v1/inventario")
+        mockMvc.perform(post("/api/v1/inventory")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isBadRequest())
@@ -395,7 +468,8 @@ class InventarioRestControllerTest {
         when(ajustarStockUseCase.ejecutar(any()))
                 .thenThrow(new TallaConUnidadesException("Tiene existencias"));
 
-        mockMvc.perform(put("/api/v1/inventario/{id}/ajuste", UUID.randomUUID())
+        mockMvc.perform(put("/api/v1/inventory/{id}/adjustment", UUID.randomUUID())
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"talla\":\"M\",\"nuevaCantidad\":5}"))
                 .andExpect(status().isUnprocessableEntity())
@@ -412,11 +486,60 @@ class InventarioRestControllerTest {
         RegistrarStockCommand command = new RegistrarStockCommand(
                 UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA, "M", 5, Instant.now());
 
-        mockMvc.perform(post("/api/v1/inventario")
+        mockMvc.perform(post("/api/v1/inventory")
+                        .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(command)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("INVENTARIO_SUSPENDIDO"))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("RBAC rechaza BUYER o rol faltante con 403 y reservas sin auth con 401")
+    void rbacYAutenticacionEnEscrituraYReservas() throws Exception {
+        RegistrarStockCommand command = new RegistrarStockCommand(
+                UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA, "M", 5, Instant.now());
+        RegistrarLoteStockCommand batch = new RegistrarLoteStockCommand(
+                UUID.randomUUID(), UUID.randomUUID(), TipoPrenda.ROPA,
+                List.of(new ItemTallaCantidadDTO("M", 5)), Instant.now());
+
+        mockMvc.perform(post("/api/v1/inventory")
+                        .header(HEADER_ROL, "BUYER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(command)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
+
+        mockMvc.perform(post("/api/v1/inventory/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(batch)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
+
+        mockMvc.perform(put("/api/v1/inventory/{id}/adjustment", UUID.randomUUID())
+                        .header(HEADER_ROL, "BUYER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"talla\":\"M\",\"nuevaCantidad\":5}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
+
+        mockMvc.perform(patch("/api/v1/inventory/garments/{g}/branches/{b}/sizes/{s}",
+                        UUID.randomUUID(), UUID.randomUUID(), "M")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unidades\":5}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
+
+        mockMvc.perform(post("/api/v1/inventory/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ReservarStockCommand(UUID.randomUUID(), UUID.randomUUID(), "M", 1, UUID.randomUUID()))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("NO_AUTENTICADO"));
+
+        mockMvc.perform(delete("/api/v1/inventory"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METODO_NO_PERMITIDO"));
     }
 }

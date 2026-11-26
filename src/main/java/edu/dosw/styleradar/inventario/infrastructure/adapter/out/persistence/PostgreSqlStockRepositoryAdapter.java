@@ -5,6 +5,9 @@ import edu.dosw.styleradar.inventario.domain.port.out.StockRepositoryPort;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.entity.StockItemJpaEntity;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.mapper.StockItemEntityMapper;
 import edu.dosw.styleradar.inventario.infrastructure.adapter.out.persistence.repository.SpringDataStockItemRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,6 +72,18 @@ public class PostgreSqlStockRepositoryAdapter implements StockRepositoryPort {
         return repository.buscarPrendasDisponiblesPorTalla(talla, sedeId).stream()
                 .map(entityMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockItem> listar(UUID sedeId, int page, int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Page<StockItemJpaEntity> result = sedeId != null
+                ? repository.findBySedeId(sedeId, pageable)
+                : repository.findAll(pageable);
+        return result.getContent().stream().map(entityMapper::toDomain).toList();
     }
 
     @Override

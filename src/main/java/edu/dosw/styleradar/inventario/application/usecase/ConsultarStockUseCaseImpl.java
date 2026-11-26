@@ -2,6 +2,7 @@ package edu.dosw.styleradar.inventario.application.usecase;
 
 import edu.dosw.styleradar.inventario.application.dto.DisponibilidadPrendaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.SedeStockDTO;
+import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VarianteStockDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
@@ -79,6 +80,25 @@ public class ConsultarStockUseCaseImpl implements ConsultarStockUseCase {
         return stockRepository.buscarDisponiblesPorSede(sedeId).stream()
                 .map(StockItem::getPrendaId)
                 .distinct()
+                .toList();
+    }
+
+    @Override
+    public List<StockItemResponseDTO> listarInventario(UUID sedeId, int page, int size) {
+        Instant ahora = Instant.now();
+        return stockRepository.listar(sedeId, page, size).stream()
+                .flatMap(item -> item.getVariantes().values().stream()
+                        .map(variante -> new StockItemResponseDTO(
+                                item.getId(),
+                                item.getPrendaId(),
+                                item.getSedeId(),
+                                item.getTipoPrenda(),
+                                variante.getTalla().getValor(),
+                                variante.getStockDisponible().valor(),
+                                variante.getStockReservado().valor(),
+                                calcularEstadoVariante(item, variante, ahora),
+                                item.isActivo(),
+                                item.getFechaActualizacion())))
                 .toList();
     }
 

@@ -11,6 +11,7 @@ import edu.dosw.styleradar.inventario.application.dto.ReservaResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.ReservarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.StockItemResponseDTO;
 import edu.dosw.styleradar.inventario.application.dto.VerificacionDisponibilidadDTO;
+import edu.dosw.styleradar.inventario.domain.model.IdSede;
 import edu.dosw.styleradar.inventario.domain.port.in.AjustarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.ConsultarStockUseCase;
 import edu.dosw.styleradar.inventario.domain.port.in.FiltrarPrendasPorTallaUseCase;
@@ -36,6 +37,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,7 +47,7 @@ import java.util.UUID;
 
 @Tag(name = "Inventory", description = "Endpoints for multi-branch inventory registration, adjustment, reservations, consultation, and stock filtering")
 @RestController
-@RequestMapping("/api/v1/inventario")
+@RequestMapping("/api/v1/inventory")
 public class InventarioRestController {
 
     private final RegistrarStockUseCase registrarStockUseCase;
@@ -69,6 +71,23 @@ public class InventarioRestController {
         this.filtrarPrendasPorTallaUseCase = filtrarPrendasPorTallaUseCase;
     }
 
+    @Operation(summary = "List inventory items",
+            description = "Lists inventory stock items, optionally filtered by branchId/storeId or X-Store-Id/X-Almacen-Id headers")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inventory items retrieved")
+    })
+    @GetMapping
+    public ResponseEntity<List<StockItemResponseDTO>> listInventory(
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) String storeId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestHeader(value = AutorizacionInventario.HEADER_STORE_ID, required = false) String storeIdHeader,
+            @RequestHeader(value = AutorizacionInventario.HEADER_ALMACEN_ID, required = false) String almacenIdHeader) {
+        UUID sedeId = AutorizacionInventario.resolverSede(branchId, storeId, storeIdHeader, almacenIdHeader);
+        return ResponseEntity.ok(consultarStockUseCase.listarInventario(sedeId, page, size));
+    }
+
     @Operation(summary = "Check garment availability",
             description = "Returns the consolidated and branch/variant-broken-down stock for a specific garment")
     @ApiResponses({
@@ -78,13 +97,13 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "404", description = "Garment not found in inventory (INVENTARIO_NO_ENCONTRADO)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventario/prenda/{prendaId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"No se encontró inventario para la prenda ...\",\"instance\":\"/api/v1/inventory/garments/{garmentId}\",\"code\":\"INVENTARIO_NO_ENCONTRADO\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
-    @GetMapping("/prenda/{prendaId}")
+    @GetMapping("/garments/{garmentId}")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> getByGarmentId(
             @Parameter(description = "Garment UUID identifier", required = true)
-            @PathVariable UUID prendaId) {
-        DisponibilidadPrendaResponseDTO response = consultarStockUseCase.consultarPorPrenda(prendaId);
+            @PathVariable UUID garmentId) {
+        DisponibilidadPrendaResponseDTO response = consultarStockUseCase.consultarPorPrenda(garmentId);
         return ResponseEntity.ok(response);
     }
 
@@ -98,11 +117,11 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @GetMapping("/prenda/{prendaId}/disponibilidad")
+    @GetMapping("/garments/{garmentId}/availability")
     public ResponseEntity<VerificacionDisponibilidadDTO> verifyAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
-            @PathVariable UUID prendaId) {
-        VerificacionDisponibilidadDTO response = consultarStockUseCase.verificarDisponibilidad(prendaId);
+            @PathVariable UUID garmentId) {
+        VerificacionDisponibilidadDTO response = consultarStockUseCase.verificarDisponibilidad(garmentId);
         return ResponseEntity.ok(response);
     }
 
@@ -111,11 +130,11 @@ public class InventarioRestController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of available garments returned")
     })
-    @GetMapping("/sedes/{sedeId}/disponibles")
+    @GetMapping("/branches/{branchId}/available")
     public ResponseEntity<List<UUID>> listAvailableGarmentsByBranch(
-            @Parameter(description = "Branch UUID identifier", required = true)
-            @PathVariable UUID sedeId) {
-        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeId);
+            @Parameter(description = "Branch UUID identifier or store NIT", required = true)
+            @PathVariable String branchId) {
+        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(IdSede.desdeTexto(branchId));
         return ResponseEntity.ok(disponibles);
     }
 
@@ -125,13 +144,13 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "200", description = "List of garments available in the selected size",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
-    @GetMapping("/tallas/{talla}/prendas")
+    @GetMapping("/sizes/{size}/garments")
     public ResponseEntity<List<UUID>> filterGarmentsBySize(
             @Parameter(description = "Typified size to query (e.g., 'M', 'L', '40')", required = true)
-            @PathVariable String talla,
+            @PathVariable String size,
             @Parameter(description = "Optional physical branch UUID identifier to narrow down the geographic filter")
-            @RequestParam(required = false) UUID sedeId) {
-        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(talla, sedeId);
+            @RequestParam(required = false) String branchId) {
+        List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(size, IdSede.desdeTexto(branchId));
         return ResponseEntity.ok(prendas);
     }
 
@@ -150,7 +169,10 @@ public class InventarioRestController {
     })
     @PostMapping
     public ResponseEntity<StockItemResponseDTO> registerStock(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody RegistrarStockCommand command) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         StockItemResponseDTO response = registrarStockUseCase.ejecutar(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -167,19 +189,22 @@ public class InventarioRestController {
             @ApiResponse(responseCode = "403", description = "Inventory suspended (INVENTARIO_SUSPENDIDO) or garment belongs to another store (PRENDA_DE_OTRO_ALMACEN)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Prenda no pertenece a la sede\",\"status\":403,\"detail\":\"La prenda ... no pertenece al almacén de la sede ...\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"PRENDA_DE_OTRO_ALMACEN\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Prenda no pertenece a la sede\",\"status\":403,\"detail\":\"La prenda ... no pertenece al almacén de la sede ...\",\"instance\":\"/api/v1/inventory/batch\",\"code\":\"PRENDA_DE_OTRO_ALMACEN\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
             @ApiResponse(responseCode = "404", description = "Garment does not exist in ms-item-catalogo (PRENDA_NO_ENCONTRADA)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"La prenda ... no existe en ms-item-catalogo\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"PRENDA_NO_ENCONTRADA\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Recurso no encontrado\",\"status\":404,\"detail\":\"La prenda ... no existe en ms-item-catalogo\",\"instance\":\"/api/v1/inventory/batch\",\"code\":\"PRENDA_NO_ENCONTRADA\",\"timestamp\":\"2026-11-20T22:58:00Z\"}"))),
             @ApiResponse(responseCode = "503", description = "ms-item-catalogo service unavailable (CATALOGO_NO_DISPONIBLE)",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class),
-                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Servicio de catálogo no disponible\",\"status\":503,\"detail\":\"El servicio de catálogo (ms-item-catalogo) no está disponible\",\"instance\":\"/api/v1/inventario/lote\",\"code\":\"CATALOGO_NO_DISPONIBLE\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
+                            examples = @ExampleObject(value = "{\"type\":\"about:blank\",\"title\":\"Servicio de catálogo no disponible\",\"status\":503,\"detail\":\"El servicio de catálogo (ms-item-catalogo) no está disponible\",\"instance\":\"/api/v1/inventory/batch\",\"code\":\"CATALOGO_NO_DISPONIBLE\",\"timestamp\":\"2026-11-20T22:58:00Z\"}")))
     })
-    @PostMapping("/lote")
+    @PostMapping("/batch")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> registerBatch(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody RegistrarLoteStockCommand command) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         DisponibilidadPrendaResponseDTO response = registrarLoteStockUseCase.registrarLote(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -197,11 +222,14 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PutMapping("/{id}/ajuste")
+    @PutMapping("/{id}/adjustment")
     public ResponseEntity<StockItemResponseDTO> adjustStock(
             @Parameter(description = "StockItem UUID identifier", required = true)
             @PathVariable UUID id,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody AjustarStockCommand command) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         AjustarStockCommand adjustedCommand = new AjustarStockCommand(id, command.talla(), command.nuevaCantidad());
         StockItemResponseDTO response = ajustarStockUseCase.ejecutar(adjustedCommand);
         return ResponseEntity.ok(response);
@@ -223,17 +251,20 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PatchMapping("/prenda/{prendaId}/sede/{sedeId}/tallas/{talla}")
+    @PatchMapping("/garments/{garmentId}/branches/{branchId}/sizes/{size}")
     public ResponseEntity<StockItemResponseDTO> updateSizeAvailability(
             @Parameter(description = "Garment UUID identifier", required = true)
-            @PathVariable UUID prendaId,
-            @Parameter(description = "Branch UUID identifier", required = true)
-            @PathVariable UUID sedeId,
+            @PathVariable UUID garmentId,
+            @Parameter(description = "Branch UUID identifier or store NIT", required = true)
+            @PathVariable String branchId,
             @Parameter(description = "Typified size to modify", required = true)
-            @PathVariable String talla,
+            @PathVariable String size,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody ActualizarDisponibilidadDTO request) {
+        AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
-                prendaId, sedeId, talla, request.unidades());
+                garmentId, IdSede.desdeTexto(branchId), size, request.unidades());
         return ResponseEntity.ok(response);
     }
 
@@ -253,9 +284,13 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reserva")
+    @PostMapping("/reservations")
     public ResponseEntity<ReservaResponseDTO> reserveStock(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody ReservarStockCommand command) {
+        AutorizacionInventario.exigirAutenticado(usuarioId, rol, roles);
         ReservaResponseDTO response = gestionarReservaUseCase.reservar(command);
         return ResponseEntity.ok(response);
     }
@@ -274,8 +309,13 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reserva/confirmar")
-    public ResponseEntity<Void> confirmReservation(@Valid @RequestBody ConfirmarReservaCommand command) {
+    @PostMapping("/reservations/confirm")
+    public ResponseEntity<Void> confirmReservation(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
+            @Valid @RequestBody ConfirmarReservaCommand command) {
+        AutorizacionInventario.exigirAutenticado(usuarioId, rol, roles);
         gestionarReservaUseCase.confirmar(command);
         return ResponseEntity.ok().build();
     }
@@ -291,8 +331,13 @@ public class InventarioRestController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @PostMapping("/reserva/liberar")
-    public ResponseEntity<Void> releaseReservation(@Valid @RequestBody LiberarReservaCommand command) {
+    @PostMapping("/reservations/release")
+    public ResponseEntity<Void> releaseReservation(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
+            @Valid @RequestBody LiberarReservaCommand command) {
+        AutorizacionInventario.exigirAutenticado(usuarioId, rol, roles);
         gestionarReservaUseCase.liberar(command);
         return ResponseEntity.ok().build();
     }
