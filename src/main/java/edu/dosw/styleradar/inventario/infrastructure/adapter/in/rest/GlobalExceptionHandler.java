@@ -102,6 +102,13 @@ public class GlobalExceptionHandler {
                 "El método HTTP '" + ex.getMethod() + "' no está permitido para esta ruta");
     }
 
+    @ExceptionHandler(edu.dosw.styleradar.inventario.domain.exception.TiendasNoDisponibleException.class)
+    public ProblemDetail handleTiendasNoDisponible(
+            edu.dosw.styleradar.inventario.domain.exception.TiendasNoDisponibleException ex) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getCodigoError(),
+                "Servicio de tiendas no disponible", ex.getMessage());
+    }
+
     @ExceptionHandler(CatalogoNoDisponibleException.class)
     public ProblemDetail handleCatalogoNoDisponible(CatalogoNoDisponibleException ex) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getCodigoError(),

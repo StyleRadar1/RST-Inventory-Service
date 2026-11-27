@@ -38,6 +38,17 @@ final class AutorizacionInventario {
         }
     }
 
+    private static final Set<String> ROLES_ADMIN = Set.of("ADMIN", "ADMIN_STYLERADAR", "STYLERADAR_ADMIN");
+
+    static boolean esAdmin(String rol, String roles) {
+        return tieneAlguno(ROLES_ADMIN, rol, roles);
+    }
+
+    /** Roles tal como se reenvian a ms-tiendas. */
+    static String rolesCombinados(String rol, String roles) {
+        return roles == null || roles.isBlank() ? rol : roles;
+    }
+
     static UUID resolverSede(UUID branchId, String storeIdParam, String storeIdHeader, String almacenIdHeader) {
         if (branchId != null) {
             return branchId;
@@ -46,11 +57,15 @@ final class AutorizacionInventario {
     }
 
     private static boolean tieneRolPermitido(String rol, String roles) {
+        return tieneAlguno(ROLES_ALMACEN_O_ADMIN, rol, roles);
+    }
+
+    private static boolean tieneAlguno(Set<String> permitidos, String rol, String roles) {
         String combinados = (rol == null ? "" : rol) + "," + (roles == null ? "" : roles);
         return Arrays.stream(combinados.split("[,\\s]+"))
                 .map(r -> r.trim().toUpperCase(Locale.ROOT))
                 .map(r -> r.startsWith("ROLE_") ? r.substring(5) : r)
-                .anyMatch(ROLES_ALMACEN_O_ADMIN::contains);
+                .anyMatch(permitidos::contains);
     }
 
     private static String firstNonBlank(String... valores) {

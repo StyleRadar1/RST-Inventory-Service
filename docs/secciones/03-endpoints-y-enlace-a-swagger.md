@@ -44,6 +44,7 @@ En `{branchId}` y en el `sedeId` del registro de stock y del lote se puede envia
 > **Dependencia síncrona con `ms-item-catalogo` y tolerancia a fallos:**
 > * El endpoint `POST /api/v1/inventory/batch` consulta de forma síncrona vía OpenFeign a `ms-item-catalogo` (`GET /api/v1/garments/{id}`) con timeouts de conexión de `5000 ms` y lectura de `15000 ms`.
 > * Si la prenda no existe en catálogo, retorna `404 PRENDA_NO_ENCONTRADA`; si pertenece a otra sede (`almacenId` distinto de `sedeId`), retorna `403 PRENDA_DE_OTRO_ALMACEN`; y si `ms-item-catalogo` no responde o está en *cold start*, degrada limpiamente devolviendo `503 CATALOGO_NO_DISPONIBLE`.
+> * **Dueño del inventario:** una cuenta de almacén solo puede escribir (`POST`, `PUT`, `PATCH`) el stock de su propia tienda, según `GET /users/{id}/store` de `ms-tiendas`; si es de otra responde `403 ACCESO_DENEGADO` y, si `ms-tiendas` no responde, `503 TIENDAS_NO_DISPONIBLE`. Los administradores de StyleRadar no tienen esta restricción.
 > * En endpoints internos no acoplados a este flujo (`/inventory`, `/patch`, `/reservations`, `/garments/{id}`), `ms-inventario` opera de forma autónoma sobre `inventario_db`. Además, el entorno Actuator expone `/actuator/health` e `/actuator/info`.
 
 <details>

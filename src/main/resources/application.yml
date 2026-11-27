@@ -9,6 +9,13 @@ server:
 clients:
   item-catalogo:
     url: ${ITEM_CATALOGO_URL:http://localhost:8220}
+  tiendas:
+    url: ${TIENDAS_URL:http://localhost:8140/api/v1}
+
+# Una tienda solo escribe su propio inventario. Se puede apagar si ms-tiendas cambia su contrato
+inventario:
+  propiedad:
+    exigir: ${INVENTARIO_EXIGIR_PROPIETARIO:true}
 
 spring:
   application:

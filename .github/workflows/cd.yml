@@ -80,7 +80,9 @@ jobs:
         run: |
           AMBIENTE=${{ steps.vars.outputs.ambiente }}
           ITEM_CATALOGO_URL="https://rst-itemcatalog-service-qa.redwave-74d6e30f.northcentralus.azurecontainerapps.io"
+          TIENDAS_URL="https://styleradar-tiendas-qa.azurewebsites.net/api/v1"
           if [ "$AMBIENTE" = "prod" ]; then
+            TIENDAS_URL="https://styleradar-tiendas-prod.azurewebsites.net/api/v1"
             ITEM_CATALOGO_URL="https://rst-itemcatalog-service-prod.redwave-74d6e30f.northcentralus.azurecontainerapps.io"
           fi
           BROKER=()
@@ -116,6 +118,7 @@ jobs:
               DB_SSL_MODE=require \
               SPRING_PROFILES_ACTIVE="$AMBIENTE" \
               ITEM_CATALOGO_URL="$ITEM_CATALOGO_URL" \
+              TIENDAS_URL="$TIENDAS_URL" \
               "${BROKER[@]}"
 
       - name: Mantener una réplica activa

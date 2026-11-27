@@ -1,5 +1,6 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
+import edu.dosw.styleradar.inventario.application.usecase.VerificarPropiedadStock;
 import edu.dosw.styleradar.inventario.application.dto.ActualizarDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
 import edu.dosw.styleradar.inventario.application.dto.ConfirmarReservaCommand;
@@ -56,13 +57,16 @@ public class InventarioRestController {
     private final GestionarReservaUseCase gestionarReservaUseCase;
     private final ConsultarStockUseCase consultarStockUseCase;
     private final FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase;
+    private final VerificarPropiedadStock propiedad;
 
     public InventarioRestController(RegistrarStockUseCase registrarStockUseCase,
                                     RegistrarLoteStockUseCase registrarLoteStockUseCase,
                                     AjustarStockUseCase ajustarStockUseCase,
                                     GestionarReservaUseCase gestionarReservaUseCase,
                                     ConsultarStockUseCase consultarStockUseCase,
-                                    FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase) {
+                                    FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase,
+                                    VerificarPropiedadStock propiedad) {
+        this.propiedad = propiedad;
         this.registrarStockUseCase = registrarStockUseCase;
         this.registrarLoteStockUseCase = registrarLoteStockUseCase;
         this.ajustarStockUseCase = ajustarStockUseCase;
@@ -169,10 +173,14 @@ public class InventarioRestController {
     })
     @PostMapping
     public ResponseEntity<StockItemResponseDTO> registerStock(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody RegistrarStockCommand command) {
         AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
+        if (!AutorizacionInventario.esAdmin(rol, roles)) {
+            propiedad.exigirSedePropia(usuarioId, AutorizacionInventario.rolesCombinados(rol, roles), command.sedeId());
+        }
         StockItemResponseDTO response = registrarStockUseCase.ejecutar(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -201,10 +209,14 @@ public class InventarioRestController {
     })
     @PostMapping("/batch")
     public ResponseEntity<DisponibilidadPrendaResponseDTO> registerBatch(
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody RegistrarLoteStockCommand command) {
         AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
+        if (!AutorizacionInventario.esAdmin(rol, roles)) {
+            propiedad.exigirSedePropia(usuarioId, AutorizacionInventario.rolesCombinados(rol, roles), command.sedeId());
+        }
         DisponibilidadPrendaResponseDTO response = registrarLoteStockUseCase.registrarLote(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -226,10 +238,14 @@ public class InventarioRestController {
     public ResponseEntity<StockItemResponseDTO> adjustStock(
             @Parameter(description = "StockItem UUID identifier", required = true)
             @PathVariable UUID id,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody AjustarStockCommand command) {
         AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
+        if (!AutorizacionInventario.esAdmin(rol, roles)) {
+            propiedad.exigirItemPropio(usuarioId, AutorizacionInventario.rolesCombinados(rol, roles), id);
+        }
         AjustarStockCommand adjustedCommand = new AjustarStockCommand(id, command.talla(), command.nuevaCantidad());
         StockItemResponseDTO response = ajustarStockUseCase.ejecutar(adjustedCommand);
         return ResponseEntity.ok(response);
@@ -259,10 +275,14 @@ public class InventarioRestController {
             @PathVariable String branchId,
             @Parameter(description = "Typified size to modify", required = true)
             @PathVariable String size,
+            @RequestHeader(value = AutorizacionInventario.HEADER_USER_ID, required = false) String usuarioId,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLE, required = false) String rol,
             @RequestHeader(value = AutorizacionInventario.HEADER_USER_ROLES, required = false) String roles,
             @Valid @RequestBody ActualizarDisponibilidadDTO request) {
         AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
+        if (!AutorizacionInventario.esAdmin(rol, roles)) {
+            propiedad.exigirSedePropia(usuarioId, AutorizacionInventario.rolesCombinados(rol, roles), IdSede.desdeTexto(branchId));
+        }
         StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
                 garmentId, IdSede.desdeTexto(branchId), size, request.unidades());
         return ResponseEntity.ok(response);
