@@ -16,6 +16,8 @@ Siguiendo el **Principio III de Twelve-Factor App** (*Configuración en el entor
 | :--- | :--- | :--- | :--- | :---: |
 | `SERVER_PORT` | Puerto HTTP del servicio (`application.yml`). | `8200` | `8200` | Sí (defecto `8200`) |
 | `ITEM_CATALOGO_URL` | URL base de `ms-item-catalogo` para OpenFeign (sin `/api/v1`). | `http://localhost:8220` | `http://host.docker.internal:8220` | Sí |
+| `TIENDAS_URL` | URL de `ms-tiendas` con `/api/v1`, para saber de quién es el inventario. | `http://localhost:8140/api/v1` | `http://host.docker.internal:8140/api/v1` | Sí |
+| `INVENTARIO_EXIGIR_PROPIETARIO` | Exige que cada tienda escriba solo su propio inventario. | `true` | `true` | No |
 | `DB_HOST` | Host del servidor PostgreSQL 16. | `localhost` | `postgres` *(forzado en compose)* | Sí |
 | `DB_PORT` | Puerto TCP de PostgreSQL 16. | `5432` | `5432` | Sí (defecto `5432`) |
 | `DB_NAME` | Nombre de la base de datos en PostgreSQL (`POSTGRES_DB`). | `inventario_db` | `inventario_db` | Sí (defecto `inventario_db`) |

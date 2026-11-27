@@ -1,5 +1,6 @@
 package edu.dosw.styleradar.inventario.infrastructure.adapter.in.rest;
 
+import edu.dosw.styleradar.inventario.application.usecase.VerificarPropiedadStock;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.dosw.styleradar.inventario.application.dto.ActualizarDisponibilidadDTO;
 import edu.dosw.styleradar.inventario.application.dto.AjustarStockCommand;
@@ -90,6 +91,25 @@ class InventarioRestControllerTest {
 
     @MockBean
     private FiltrarPrendasPorTallaUseCase filtrarPrendasPorTallaUseCase;
+
+    @MockBean
+    private VerificarPropiedadStock propiedad;
+
+    @Test
+    @DisplayName("Una tienda no puede escribir el stock de otra: 403 y no se modifica")
+    void tiendaNoEscribeStockAjeno() throws Exception {
+        UUID prenda = UUID.randomUUID();
+        UUID sede = UUID.randomUUID();
+        org.mockito.Mockito.doThrow(new edu.dosw.styleradar.inventario.domain.exception.AccesoDenegadoException("ajeno"))
+                .when(propiedad).exigirSedePropia("7", STORE_ADMIN, sede);
+
+        mockMvc.perform(patch("/api/v1/inventory/garments/{g}/branches/{b}/sizes/{s}", prenda, sede, "M")
+                        .header(HEADER_ROL, STORE_ADMIN).header(HEADER_USER_ID, "7")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"unidades\":3}"))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verifyNoInteractions(ajustarStockUseCase);
+    }
 
     @Test
     @DisplayName("GET /api/v1/inventory retorna 200 OK y soporta filtros branchId/storeId o headers")
