@@ -78,7 +78,7 @@ public class InventarioRestController {
     })
     @GetMapping
     public ResponseEntity<List<StockItemResponseDTO>> listInventory(
-            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) String branchId,
             @RequestParam(required = false) String storeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -134,7 +134,8 @@ public class InventarioRestController {
     public ResponseEntity<List<UUID>> listAvailableGarmentsByBranch(
             @Parameter(description = "Branch UUID identifier or store NIT", required = true)
             @PathVariable String branchId) {
-        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(IdSede.desdeTexto(branchId));
+        List<UUID> disponibles = consultarStockUseCase.listarPrendasDisponiblesPorSede(
+                AutorizacionInventario.resolverSedeDesdeTexto(branchId));
         return ResponseEntity.ok(disponibles);
     }
 
@@ -148,7 +149,7 @@ public class InventarioRestController {
     public ResponseEntity<List<UUID>> filterGarmentsBySize(
             @Parameter(description = "Typified size to query (e.g., 'M', 'L', '40')", required = true)
             @PathVariable String size,
-            @Parameter(description = "Optional physical branch UUID identifier to narrow down the geographic filter")
+            @Parameter(description = "Optional physical branch UUID identifier or store NIT to narrow down the geographic filter")
             @RequestParam(required = false) String branchId) {
         List<UUID> prendas = filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla(size, IdSede.desdeTexto(branchId));
         return ResponseEntity.ok(prendas);
@@ -264,7 +265,7 @@ public class InventarioRestController {
             @Valid @RequestBody ActualizarDisponibilidadDTO request) {
         AutorizacionInventario.exigirRolAlmacenOAdmin(rol, roles);
         StockItemResponseDTO response = ajustarStockUseCase.actualizarPorPrendaYSede(
-                garmentId, IdSede.desdeTexto(branchId), size, request.unidades());
+                garmentId, AutorizacionInventario.resolverSedeDesdeTexto(branchId), size, request.unidades());
         return ResponseEntity.ok(response);
     }
 

@@ -140,6 +140,9 @@ class GlobalExceptionHandlerTest {
 
         var violation = new ConstraintViolationException("Inválido", Set.of());
         assertCodigoYTimestamp(handler.handleConstraintViolation(violation), HttpStatus.BAD_REQUEST, "DATOS_INVALIDOS");
+
+        var illegalArg = new IllegalArgumentException("El identificador de sede (branchId) es obligatorio");
+        assertCodigoYTimestamp(handler.handleIllegalArgument(illegalArg), HttpStatus.BAD_REQUEST, "DATOS_INVALIDOS");
     }
 
     @Test

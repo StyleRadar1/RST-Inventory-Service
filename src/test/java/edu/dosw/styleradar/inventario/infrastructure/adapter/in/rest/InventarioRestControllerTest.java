@@ -162,29 +162,83 @@ class InventarioRestControllerTest {
     }
 
     @Test
-    @DisplayName("Las rutas de sede y el lote aceptan el NIT de la tienda")
+    @DisplayName("Las rutas de sede y los comandos POST aceptan NIT de la tienda y UUID")
     void aceptaElNitDeLaTiendaComoSede() throws Exception {
-        UUID sedeDesdeNit = IdSede.desdeTexto("900555777-1");
+        String nit = "900123456-1";
+        UUID sedeDesdeNit = IdSede.desdeTexto(nit);
         UUID prendaId = UUID.randomUUID();
+        StockItemResponseDTO stockItem = new StockItemResponseDTO(
+                UUID.randomUUID(), prendaId, sedeDesdeNit, TipoPrenda.ROPA, "M", 15, 0,
+                EstadoItem.DISPONIBLE, true, Instant.now());
+
         when(consultarStockUseCase.listarPrendasDisponiblesPorSede(sedeDesdeNit)).thenReturn(List.of(prendaId));
+        when(consultarStockUseCase.listarInventario(sedeDesdeNit, 0, 20)).thenReturn(List.of(stockItem));
+        when(filtrarPrendasPorTallaUseCase.filtrarPrendasDisponiblesPorTalla("M", sedeDesdeNit)).thenReturn(List.of(prendaId));
         when(registrarLoteStockUseCase.registrarLote(any())).thenReturn(new DisponibilidadPrendaResponseDTO(
                 prendaId, TipoPrenda.ROPA, EstadoItem.DISPONIBLE, 10, List.of()));
+        when(registrarStockUseCase.ejecutar(any())).thenReturn(stockItem);
+        when(ajustarStockUseCase.actualizarPorPrendaYSede(prendaId, sedeDesdeNit, "M", 15)).thenReturn(stockItem);
 
-        mockMvc.perform(get("/api/v1/inventory/branches/{branchId}/available", "900555777-1"))
+        mockMvc.perform(get("/api/v1/inventory").param("branchId", nit))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sedeId").value(sedeDesdeNit.toString()));
+
+        mockMvc.perform(get("/api/v1/inventory/branches/{branchId}/available", nit))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value(prendaId.toString()));
+
+        mockMvc.perform(get("/api/v1/inventory/sizes/{size}/garments", "M").param("branchId", nit))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(prendaId.toString()));
+
+        mockMvc.perform(patch("/api/v1/inventory/garments/{garmentId}/branches/{branchId}/sizes/{size}",
+                        prendaId, nit, "M")
+                        .header(HEADER_ROL, STORE_ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unidades\":15}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sedeId").value(sedeDesdeNit.toString()))
+                .andExpect(jsonPath("$.stockDisponible").value(15));
 
         mockMvc.perform(post("/api/v1/inventory/batch")
                         .header(HEADER_ROL, STORE_ADMIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"prendaId":"%s","sedeId":"900555777-1","tipoPrenda":"ROPA",
+                                {"prendaId":"%s","sedeId":"%s","tipoPrenda":"ROPA",
                                  "tallas":[{"talla":"M","cantidad":10}],"fechaPublicacion":"2026-11-25T00:00:00Z"}
-                                """.formatted(prendaId)))
+                                """.formatted(prendaId, nit)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/inventory")
+                        .header(HEADER_ROL, STORE_ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"prendaId":"%s","sedeId":"%s","tipoPrenda":"ROPA",
+                                 "talla":"M","cantidad":15,"fechaPublicacion":"2026-11-25T00:00:00Z"}
+                                """.formatted(prendaId, nit)))
                 .andExpect(status().isCreated());
 
         verify(registrarLoteStockUseCase).registrarLote(argThat(
                 command -> sedeDesdeNit.equals(command.sedeId())));
+        verify(registrarStockUseCase).ejecutar(argThat(
+                command -> sedeDesdeNit.equals(command.sedeId())));
+        verify(ajustarStockUseCase).actualizarPorPrendaYSede(prendaId, sedeDesdeNit, "M", 15);
+    }
+
+    @Test
+    @DisplayName("branchId vacío o en blanco en rutas de sede retorna 400 DATOS_INVALIDOS")
+    void branchIdEnBlancoRetorna400() throws Exception {
+        mockMvc.perform(get("/api/v1/inventory/branches/{branchId}/available", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DATOS_INVALIDOS"));
+
+        mockMvc.perform(patch("/api/v1/inventory/garments/{garmentId}/branches/{branchId}/sizes/{size}",
+                        UUID.randomUUID(), "   ", "M")
+                        .header(HEADER_ROL, STORE_ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unidades\":5}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DATOS_INVALIDOS"));
     }
 
     @Test

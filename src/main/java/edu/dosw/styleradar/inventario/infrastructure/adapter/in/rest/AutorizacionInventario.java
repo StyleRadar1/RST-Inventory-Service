@@ -38,11 +38,16 @@ final class AutorizacionInventario {
         }
     }
 
-    static UUID resolverSede(UUID branchId, String storeIdParam, String storeIdHeader, String almacenIdHeader) {
-        if (branchId != null) {
-            return branchId;
+    static UUID resolverSede(String branchId, String storeIdParam, String storeIdHeader, String almacenIdHeader) {
+        return IdSede.desdeTexto(firstNonBlank(branchId, storeIdParam, storeIdHeader, almacenIdHeader));
+    }
+
+    static UUID resolverSedeDesdeTexto(String rawBranchId) {
+        UUID sedeId = IdSede.desdeTexto(rawBranchId);
+        if (sedeId == null) {
+            throw new IllegalArgumentException("El identificador de sede (branchId) es obligatorio");
         }
-        return IdSede.desdeTexto(firstNonBlank(storeIdParam, storeIdHeader, almacenIdHeader));
+        return sedeId;
     }
 
     private static boolean tieneRolPermitido(String rol, String roles) {

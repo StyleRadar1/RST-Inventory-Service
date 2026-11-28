@@ -152,6 +152,12 @@ public class GlobalExceptionHandler {
                 "Solicitud inválida", ex.getMessage());
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
+        return problem(HttpStatus.BAD_REQUEST, CodigoError.DATOS_INVALIDOS,
+                "Solicitud inválida", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, CodigoError.ERROR_INTERNO,

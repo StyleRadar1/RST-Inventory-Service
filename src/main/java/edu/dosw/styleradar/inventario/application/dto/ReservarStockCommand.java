@@ -1,5 +1,6 @@
 package edu.dosw.styleradar.inventario.application.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -17,7 +18,8 @@ public record ReservarStockCommand(
         UUID prendaId,
 
         @NotNull(message = "El sedeId es obligatorio")
-        @Schema(description = "Identificador UUID de la sede", example = "018e3a2b-2222-7000-8000-000000000002")
+        @Schema(description = "Identificador UUID de la sede o NIT del almacén", example = "018e3a2b-2222-7000-8000-000000000002")
+        @JsonDeserialize(using = IdSedeDeserializer.class)
         UUID sedeId,
 
         @NotBlank(message = "La talla es obligatoria")
